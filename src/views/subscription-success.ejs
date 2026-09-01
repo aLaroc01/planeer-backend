@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Subscription Activated</title>
+<style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f3f4f6;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+ 
+    .card {
+      background: #fff;
+      border-radius: 1rem;
+      padding: 2rem;
+      max-width: 480px;
+      width: 100%;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+ 
+    .icon {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: #d1fae5;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+ 
+    .icon svg {
+      width: 32px;
+      height: 32px;
+      color: #10b981;
+    }
+ 
+    h1 {
+      font-size: 1.8rem;
+      color: #111827;
+      margin-top: 1rem;
+      margin-bottom: 0.5rem;
+    }
+ 
+    p {
+      color: #6b7280;
+      margin-bottom: 1.5rem;
+    }
+ 
+    .details {
+      text-align: left;
+      margin-top: 1.5rem;
+      border-top: 1px solid #e5e7eb;
+      padding-top: 1rem;
+    }
+ 
+    .details div {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.75rem;
+      font-size: 0.9rem;
+    }
+ 
+    .details .price {
+      color: #10b981;
+      font-weight: 600;
+    }
+ 
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 0.75rem;
+      margin-top: 1.5rem;
+      border: none;
+      border-radius: 0.75rem;
+      background-color: #10b981;
+      color: #fff;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background 0.3s;
+    }
+ 
+    .btn:hover {
+      background-color: #059669;
+    }
+ 
+    @media(max-width: 500px){
+      h1 { font-size: 1.5rem; }
+    }
+</style>
+</head>
+ 
+<body>
+ 
+  <div class="card">
+ 
+    <div class="icon">
+<svg fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round"
+          d="M5 13l4 4L19 7" />
+</svg>
+</div>
+ 
+    <h1>Subscription Activated 🎉</h1>
+<p>Your subscription is now active.</p>
+ 
+    <div class="details">
+<div><span>Subscription ID</span><span><%= subscription.stripeSubscriptionId %></span></div>
+<div><span>Package</span><span><%= subscription.package.title %></span></div>
+<div><span>Price</span><span class="price">$<%= subscription.price %></span></div>
+<div><span>Start Date</span><span><%= subscription.currentPeriodStart.toDateString() %></span></div>
+<div><span>End Date</span><span><%= subscription.currentPeriodEnd.toDateString() %></span></div>
+<div><span>Status</span><span style="color:#10b981; font-weight:600;"><%= subscription.status %></span></div>
+</div>
+ 
+    <a href="https://myplaneer.com/plans" class="btn">Go to Dashboard</a>
+ 
+  </div>
+ 
+</body>
+</html>
