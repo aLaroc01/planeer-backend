@@ -3,12 +3,24 @@ import { NextFunction, Request, Response } from "express";
 import  jwt  from 'jsonwebtoken';
 import { config } from "../config";
 import { User } from "../modules/auth/user.model";
+import { Role } from "../modules/auth/user.interface";
 
 
 interface AuthenticatedRequest extends Request {
   user?:any
 }
 
+export const isAdminOrSuperAdmin = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const role = (req.user as any)?.role;
+  if (role !== Role.ADMIN && role !== Role.SUPER_ADMIN) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+  next();
+};
 
 
 export const auth= async(req:AuthenticatedRequest, res:Response, next:NextFunction) => {
@@ -34,6 +46,7 @@ export const auth= async(req:AuthenticatedRequest, res:Response, next:NextFuncti
     return res.status(403).json({ message: "Invalid token" });
   }
 }
+
 
 
 
