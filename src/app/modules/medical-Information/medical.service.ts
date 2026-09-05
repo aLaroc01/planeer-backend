@@ -1,14 +1,5 @@
 import { Request, Response } from "express";
-import { MedicalModel } from "./medical.model";
-
-
-
-
-
-
-
-
-
+import { MedicalInfoModel } from "./medical.model";
 
 
 export const MedicalUpdateService = async (req: Request) => {
@@ -35,7 +26,7 @@ export const MedicalUpdateService = async (req: Request) => {
     const completenessPercentage = (filledFields / totalFields) * 100;
 
  
-    const updatedMedicalData = await MedicalModel.findOneAndUpdate(
+    const updatedMedicalData = await MedicalInfoModel.findOneAndUpdate(
       { userID: user_id },
        { 
         ...requestBody, 
@@ -116,7 +107,7 @@ export const MedicalGetService = async (req: Request) => {
     }
 
 
-    const financialData = await MedicalModel.findOne(
+    const financialData = await MedicalInfoModel.findOne(
       { userID: user_id },
       "-createdAt -updatedAt"
     );

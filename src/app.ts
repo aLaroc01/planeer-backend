@@ -16,10 +16,10 @@ import { SubscriptionRoutes } from './app/modules/subscriptions-information/subs
 import { startSubscriptionExpireCron } from './app/modules/subscriptions-information/subscriptionExpire.cron';
 import { requestLogger } from './helpers/requestLogger';
 import dotenv from "dotenv";
-import { ProfileRoutes } from './app/modules/Profile-Information/profile.routes';
+import { profileRoutes } from './app/modules/Profile-Information/profile.routes';
 import { ReviewRoutes } from './app/modules/reviews/reviews.routes';
 import connectionRoutes  from './app/modules/connections/connection.routes';
-const fileUpload = require("express-fileupload");
+import fileUpload from "express-fileupload";
 import { AuditLogRoutes } from './app/modules/audit-log/auditLog.routes';
 import { SupportRoutes } from "./app/modules/support/support.routes";
 import { ChecklistRoutes } from "./app/modules/checklist/checklist.routes";
@@ -33,11 +33,7 @@ const app = express();
 app.post(
   "/api/v1/subscriptions/webhook",
   express.raw({ type: "application/json" }),
-  // The controller is exported as an object whose generated type does not
-  // include the webhook handler yet.
-  (SubscriptionController as typeof SubscriptionController & {
-    stripeWebhookHandler: (req: Request, res: Response) => void;
-  }).stripeWebhookHandler,
+  SubscriptionController.stripeWebhookHandler,
 );
 
 app.set("view engine", "ejs");
@@ -161,7 +157,7 @@ app.use(
 app.use("/api/v1", userRoutes);
 app.use("/api/v1", financialRoutes);
 app.use("/api/v1", medicalRoutes);
-app.use("/api/v1", ProfileRoutes);
+app.use("/api/v1", profileRoutes);
 app.use("/api/v1", personalRoutes);
 app.use("/api/v1", homeautoRoutes);
 app.use("/api/v1", ReportRoutes);

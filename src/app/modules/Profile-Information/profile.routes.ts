@@ -20,4 +20,4 @@ router.patch(
   updateSuggestionStatus,
 );
 
-export const ProfileRoutes = router;
+export const profileRoutes = router;
