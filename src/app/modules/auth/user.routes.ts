@@ -1,5 +1,5 @@
 import express from "express";
-import { adminDeleteUser, AdminEmail, adminLoginController, adminUpdateUser, alldatapercentage, codeverify,      forgetPassword,  getAllOwnUserDataController,  GetAllProfile, getAllProxysetController, getAllUserDataController, getCounts, getNewUsersLast10Days, GetProfileData, getSystemPerformance, getUsersWhoAddedMeAsProxyController, getUsersWhoSetMyProxy, loginUser,  ProxysetController, registerUser, searchUsersController, updateUserController, UserAnalysisController, UserList, userSelfUpdate,  } from "./user.controller";
+import { adminDeleteUser, AdminEmail, adminLoginController, adminUpdateUser, alldatapercentage, codeverify, forgetPassword,  getAllOwnUserDataController,  GetAllProfile, getAllProxysetController, getAllUserDataController, getCounts, getNewUsersLast10Days, GetProfileData, getSystemPerformance, getUsersWhoAddedMeAsProxyController, getUsersWhoSetMyProxy, loginUser,  ProxysetController, registerUser, searchUsersController, updateUserController, UserAnalysisController, UserList, userSelfUpdate,  } from "./user.controller";
 import { auth, isAdmin } from './../../middleware/auth.middleware';
 
 
