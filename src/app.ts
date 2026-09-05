@@ -19,7 +19,7 @@ import dotenv from "dotenv";
 import { profileRoutes } from './app/modules/Profile-Information/profile.routes';
 import { ReviewRoutes } from './app/modules/reviews/reviews.routes';
 import connectionRoutes  from './app/modules/connections/connection.routes';
-import fileUpload from "express-fileupload";
+import fileUpload from 'express-fileupload';
 import { AuditLogRoutes } from './app/modules/audit-log/auditLog.routes';
 import { SupportRoutes } from "./app/modules/support/support.routes";
 import { ChecklistRoutes } from "./app/modules/checklist/checklist.routes";
