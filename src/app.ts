@@ -19,6 +19,8 @@ import dotenv from "dotenv";
 import { profileRoutes } from './app/modules/Profile-Information/profile.routes';
 import { ReviewRoutes } from './app/modules/reviews/reviews.routes';
 import connectionRoutes  from './app/modules/connections/connection.routes';
+// express-fileupload does not ship TypeScript declarations.
+// @ts-expect-error -- the package is used as middleware at runtime.
 import fileUpload from 'express-fileupload';
 import { AuditLogRoutes } from './app/modules/audit-log/auditLog.routes';
 import { SupportRoutes } from "./app/modules/support/support.routes";
