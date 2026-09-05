@@ -15,7 +15,7 @@ router.get('/cancel', SubscriptionController.orderCancel);
 router.post('/create-checkout-session/:id', auth, SubscriptionController.createCheckoutSession);
 router.post('/update/:id', auth, SubscriptionController.updateSubscription);
 router.delete('/subscription/cancel/:id',  SubscriptionController.cancelSubscription);
-router.get('/monthly-earnings-stats',auth,isAdmin,SubscriptionController.monthlyEarningsStats);
+// router.get('/monthly-earnings-stats',auth,isAdmin,SubscriptionController.monthlyEarningsStats);
 router.get('/subscriptions/stats',auth,isAdmin,SubscriptionController.getMonthlyRevenueController);
 
 
