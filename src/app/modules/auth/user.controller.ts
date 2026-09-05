@@ -1,5 +1,8 @@
 import { NextFunction, Request, Response } from "express";
-import { adminDeleteUserService, adminEmailService, adminLoginService, adminUpdateUserService, codeVerification,  existingUser,   getAllOwnUserDataService,   getAllUserDataService,  getallUsers, getCountsService, getNewUsersLast10DaysService, getprofileService, getProxysetData, getUserFullProfileService,getUsersWhoAddedMeAsProxyService,getUsersWhoSetMyProxyService,LoginInUser,  ProxysetService, searchUsersService,  updatePassword, updateUserService, UserAnalysisService, userSelfUpdateService } from "./user.service";
+import { adminDeleteUserService, adminEmailService, adminLoginService, adminUpdateUserService, codeVerification,  existingUser,  
+   getAllOwnUserDataService,   
+   getAllUserDataService,  getallUsers, getCountsService, getNewUsersLast10DaysService, getprofileService, getProxysetData, getUsersWhoAddedMeAsProxyService,
+   getUsersWhoSetMyProxyService,LoginInUser,  ProxysetService, searchUsersService,  updatePassword, updateUserService, UserAnalysisService, userSelfUpdateService } from "./user.service";
 import { ProxyUser } from "./user.interface";
 import { User } from "./user.model";
 import { logSuccess } from "../../../helpers/successLogger";
@@ -8,15 +11,6 @@ import { getErrorCount, incrementErrorCount } from "../../../helpers/errorCounte
  import jwt from "jsonwebtoken";
  import { config } from './../../config/index';
  import bcrypt from "bcryptjs";
-
-
-
-
-
-
-
-
-
 
 
 export const registerUser = async (
@@ -40,7 +34,7 @@ export const registerUser = async (
         );
 
       logSuccess(req, "User registered successfully", { userId: user._id, email: user.email });
-    return res.status(201).json({success: true,message: "User registered successfully",statusCode: 201, data:{ _id: user._id ,phoneNumber: user.phoneNumber,email: user.email,role: user.role, userPercentage: user.userPercentage, token:token },meta: null});
+    return res.status(201).json({success: true,message: "User registered successfully",statusCode: 201, data:{ _id: user._id ,phoneNumber: user.phoneNumber,email: user.email,role: user.role, token:token },meta: null});
   } catch (error) {
     next(error);
   }
@@ -101,7 +95,7 @@ export const userSelfUpdate = async (
 ): Promise<void> => {
   const result = await userSelfUpdateService(req);
 
-  if (result.status === "success") {
+  if (result?.status === "success") {
     logSuccess(req, "User updated own profile", {
       userId: req.user?.id,
     });
@@ -249,37 +243,37 @@ export const getAllProxysetController = async (req: Request, res: Response) => {
 // };
 
 
-export const alldatapercentage = async (req: Request, res: Response) => {
-  try {
-    // ✅ Handle string | string[] safely
-    const userId: string = Array.isArray(req.params.userId)
-      ? req.params.userId[0]
-      : req.params.userId;
+// export const alldatapercentage = async (req: Request, res: Response) => {
+//   try {
+//     // ✅ Handle string | string[] safely
+//     const userId: string = Array.isArray(req.params.userId)
+//       ? req.params.userId[0]
+//       : req.params.userId;
 
-    const userProfile = await getUserFullProfileService(userId);
+//     const userProfile = await getUserFullProfileService(userId);
 
-    // 🔹 Success log
-    logSuccess(req, "Fetched full user profile", { userId });
+//     // 🔹 Success log
+//     logSuccess(req, "Fetched full user profile", { userId });
 
-    if (!userProfile) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
+//     if (!userProfile) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "User not found",
+//       });
+//     }
 
-    return res.status(200).json({
-      success: true,
-      data: userProfile,
-    });
-  } catch (error) {
-    console.error("Error fetching user profile:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal Server Error",
-    });
-  }
-};
+//     return res.status(200).json({
+//       success: true,
+//       data: userProfile,
+//     });
+//   } catch (error) {
+//     console.error("Error fetching user profile:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//     });
+//   }
+// };
 
 
 
@@ -693,6 +687,14 @@ export const getUsersWhoAddedMeAsProxyController = async (
   try {
     const myUserId = req.user?.id;
 
+    if (!myUserId) {
+      res.status(401).json({
+        success: false,
+        message: "Unauthorized"
+      });
+      return;
+    }
+
     const users = await getUsersWhoAddedMeAsProxyService(myUserId);
 
     res.status(200).json({
@@ -858,7 +860,7 @@ export const adminUpdateUser = async (
 ): Promise<void> => {
   const result = await adminUpdateUserService(req);
 
-  if (result.status === "success") {
+  if (result?.status === "success") {
     logSuccess(req, "Admin updated user data", {
       adminId: req.user?.id,
       updatedUserId: req.params.id,

@@ -1,7 +1,7 @@
 
 import { User } from "../auth/user.model";
 import { HomeAutoModel } from "../homeAuto-Information/homeauto.model";
-import { MedicalModel } from "../medical-Information/medical.model";
+import { MedicalInfoModel } from "../medical-Information/medical.model";
 import { SocialInfoModel } from "../social-Information/social.model";
 import { FinancialModel } from "./financial.model";
 import { Request } from "express";
@@ -90,34 +90,5 @@ export const FinancialGetService = async (req: Request) => {
     return { status: "failed", message: error.message };
   }
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

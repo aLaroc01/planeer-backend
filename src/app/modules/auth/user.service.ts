@@ -669,22 +669,22 @@ export const getUserFullProfileService = async (userId: string) => {
 //proxysetId  data 
 
 
-// export const getAllOwnUserDataService = async (loggedInUserId: string) => {
+export const getAllOwnUserDataService = async (loggedInUserId: string) => {
 
-//   const user = await User.findById(loggedInUserId);
-//   if (!user) throw new Error("USER_NOT_FOUND");
+  const user = await User.findById(loggedInUserId);
+  if (!user) throw new Error("USER_NOT_FOUND");
 
 
-//   const [homeauto, medical, financial,socialInfo, personalInfo] = await Promise.all([
-//     HomeAutoModel.find({ userID: loggedInUserId }),
-//     MedicalModel.find({ userID: loggedInUserId }),
-//     FinancialModel.find({ userID: loggedInUserId }),
-//     SocialInfoModel.find({ userID: loggedInUserId }),
-//     PersonalModel.find({ userID: loggedInUserId }), 
-//     // User.find({ userID: loggedInUserId }),
+  const [homeauto, medical, financial,socialInfo, personalInfo] = await Promise.all([
+    HomeAutoModel.find({ userID: loggedInUserId }),
+    MedicalInfoModel.find({ userID: loggedInUserId }),
+    FinancialModel.find({ userID: loggedInUserId }),
+    SocialInfoModel.find({ userID: loggedInUserId }),
+    PersonalModel.find({ userID: loggedInUserId }), 
+    // User.find({ userID: loggedInUserId }),
   
-//   ]);
-// };
+  ]);
+};
 
     // 🔢 Calculate percentages
 
