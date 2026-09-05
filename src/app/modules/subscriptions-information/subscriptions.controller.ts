@@ -1,42 +1,46 @@
 import catchAsync from "../../../shared/catchAsync";
 import sendResponse from "../../../shared/sendResponse";
+import type { Request, Response } from "express";
 
-import { getMonthlyRevenueService, handlePaymentFailed, handleSubscriptionDeleted, saveSubscriptionToDB, SubscriptionService } from "./subscriptions.service";
+import { 
+  getMonthlyRevenueService, 
+  handlePaymentFailed, 
+  handleSubscriptionDeleted, 
+  saveSubscriptionToDB,
+  saveSubscriptionToDBFromPaymentLink,
+  SubscriptionService} from "./subscriptions.service";
 import AppError from "../../../errors/AppError";
 import { StatusCodes } from "http-status-codes";
-import stripe, { Stripe } from "stripe";
+import Stripe from "stripe";
+// import stripe from '../../config/stripe';
+
+
 
 const subscriptions = catchAsync(async (req, res) => {
-     const result = await SubscriptionService.subscriptionsFromDB(req.query);
      sendResponse(res, {
-          statusCode: StatusCodes.OK,
-          success: true,
-          message: 'Subscription list retrieved successfully',
-          data: result,
+          statusCode: StatusCodes.NOT_IMPLEMENTED,
+          success: false,
+          message: 'Subscription list retrieval is not implemented',
+          data: null,
      });
 });
 
 
 const subscriptionDetails = catchAsync(async (req, res) => {
-     const { id }: any = req.user;
-     const result = await SubscriptionService.subscriptionDetailsFromDB(id);
      sendResponse(res, {
-          statusCode: StatusCodes.OK,
-          success: true,
-          message: 'Subscription details retrieved successfully',
-          data: result.subscription,
+          statusCode: StatusCodes.NOT_IMPLEMENTED,
+          success: false,
+          message: 'Subscription details retrieval is not implemented',
+          data: null,
      });
 });
 
 const cancelSubscription = catchAsync(async (req, res) => {
-     const { id }: any = req.user;
-     const result = await SubscriptionService.cancelSubscriptionToDB(id);
-
      sendResponse(res, {
-          statusCode: StatusCodes.OK,
-          success: true,
-          message: 'Cancel subscription successfully',
-          data: result,
+          statusCode: StatusCodes.NOT_IMPLEMENTED,
+          success: false,
+          message: 'Cancel subscription is not implemented',
+          data: null,
      });
 });
 // create checkout session
@@ -58,24 +62,27 @@ const cancelSubscription = catchAsync(async (req, res) => {
 
 
 const createCheckoutSession = catchAsync(async (req, res) => {
-    const { id }: any = req.user;
-    // ✅ convert string | string[] to string
-    const packageId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const { id }: any = req.user;
+  const { packageId } = req.body;
 
-    const result = await SubscriptionService.createSubscriptionCheckoutSession(
-        String(id),
-        packageId
-    );
+  if (!packageId) {
+    throw new AppError(StatusCodes.BAD_REQUEST, "Package ID is required");
+  }
 
-    sendResponse(res, {
-        statusCode: StatusCodes.OK,
-        success: true,
-        message: 'Create checkout session successfully',
-        data: {
-            sessionId: result.sessionId,
-            url: result.url,
-        },
-    });
+  const result = await SubscriptionService.createSubscriptionCheckoutSession(
+    String(id),
+    String(packageId)
+  );
+
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: "Create checkout session successfully",
+    data: {
+      sessionId: result.sessionId,
+      url: result.url,
+    },
+  });
 });
 
 
@@ -91,7 +98,8 @@ const updateSubscription = catchAsync(async (req, res) => {
     // ✅ package id কে string বানানো
     const packageId: string = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     if (!packageId) throw new Error("Invalid package ID");
-      const result = await SubscriptionService.upgradeSubscriptionToDB(userId, packageId);
+      // Use existing service method to create/upgrade a checkout session
+      const result = await SubscriptionService.createSubscriptionCheckoutSession(userId, packageId);
      
      // const { id }: any = req.user;
      // const packageId = req.params.id;
@@ -114,18 +122,6 @@ const orderCancel = catchAsync(async (req, res) => {
     const sessionId = req.query.session_id as string || 'N/A';
     res.render('cancel', { sessionId });  // ✅ sessionId pass করো
 });
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -164,45 +160,104 @@ export const checkoutSuccessController = catchAsync(async (req, res ) => {
 
 
 
- const monthlyEarningsStats = catchAsync(async (req, res) => {
-          const year = Number(req.query.year) || new Date().getFullYear();
+//  const monthlyEarningsStats = catchAsync(async (req, res) => {
+//           const year = Number(req.query.year) || new Date().getFullYear();
 
-          const result =
-               await SubscriptionService.getMonthlyEarningsStatsFromDB(year);
+//           const result =
+//                await SubscriptionService.getMonthlyEarningsStatsFromDB(year);
 
-          sendResponse(res, {
-               statusCode: StatusCodes.OK,
-               success: true,
-               message: 'Monthly earnings stats retrieved successfully',
-               data: result,
-          });
-     }
+//           sendResponse(res, {
+//                statusCode: StatusCodes.OK,
+//                success: true,
+//                message: 'Monthly earnings stats retrieved successfully',
+//                data: result,
+//           });
+//      }
+// );
+
+
+export const getStripeMonthlyRevenueController = catchAsync(
+  async (_req: Request, res: Response) => {
+    const result = await SubscriptionService.getStripeMonthlyRevenue();
+
+    sendResponse(res, {
+      statusCode: StatusCodes.OK,
+      success: true,
+      message: "Stripe monthly revenue retrieved successfully",
+      data: result,
+    });
+  }
 );
 
 
 
+export const getMonthlyRevenueController = catchAsync(async (_req, res) => {
+  const revenueData = await getMonthlyRevenueService();
 
-
-
-export const getMonthlyRevenueController = catchAsync(async (req, res) => {
-    const revenueData = await getMonthlyRevenueService();
-
-    sendResponse(res, {
-        statusCode: StatusCodes.OK,
-        success: true,
-        message: "Monthly revenue fetched successfully",
-        data: revenueData,
-    });
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: "Monthly revenue fetched successfully",
+    data: revenueData,
+  });
 });
 
 
+const createBillingPortalSession = catchAsync(async (req, res) => {
+  const userId = Array.isArray(req.user?.id)
+    ? req.user.id[0]
+    : req.user?.id;
+
+  if (!userId) {
+    throw new AppError(StatusCodes.UNAUTHORIZED, "User not found");
+  }
+
+  const result = await SubscriptionService.createBillingPortalSession(
+    String(userId)
+  );
+
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: "Billing portal session created successfully",
+    data: {
+      url: result.url,
+    },
+  });
+});
 
 
+export const getSalesSummaryController = catchAsync(
+  async (req: Request, res: Response) => {
+    const result = await SubscriptionService.getSalesSummary();
 
+    sendResponse(res, {
+      statusCode: StatusCodes.OK,
+      success: true,
+      message: "Sales summary retrieved successfully",
+      data: result,
+    });
+  }
+);
+
+
+export const getStripeSalesSummaryController = catchAsync(
+  async (_req: Request, res: Response) => {
+    const result = await SubscriptionService.getStripeSalesSummary();
+
+    sendResponse(res, {
+      statusCode: StatusCodes.OK,
+      success: true,
+      message: "Stripe sales summary retrieved successfully",
+      data: result,
+    });
+  }
+);
 
 
 export const stripeWebhookHandler = catchAsync( async (req, res) => {
   const sig = req.headers["stripe-signature"] as string | undefined;
+
 
   if (!sig) {
     return sendResponse(res, {
@@ -216,7 +271,7 @@ export const stripeWebhookHandler = catchAsync( async (req, res) => {
   let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(
+    event = Stripe.webhooks.constructEvent(
       req.body,
       sig,
       process.env.STRIPE_WEBHOOK_SECRET!
@@ -235,29 +290,59 @@ export const stripeWebhookHandler = catchAsync( async (req, res) => {
     let responseData;
 
     switch (event.type) {
-      case "customer.subscription.deleted":
-        responseData = await handleSubscriptionDeleted(
-          event.data.object as Stripe.Subscription
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session;
+
+        const subscription =
+          await SubscriptionService.saveSubscriptionToDBFromPaymentLink(session);
+
+        responseData = {
+          statusCode: StatusCodes.OK,
+          success: true,
+          message: "Checkout session completed and subscription synchronized",
+          data: subscription,
+        };
+        break;
+      }
+
+      case "customer.subscription.created":
+      case "customer.subscription.updated":
+      case "customer.subscription.deleted": {
+        const stripeSubscription = event.data.object as Stripe.Subscription;
+
+        const subscription =
+          await SubscriptionService.syncSubscriptionFromStripe(stripeSubscription);
+
+        responseData = {
+          statusCode: StatusCodes.OK,
+          success: true,
+          message: `Subscription ${stripeSubscription.status} synchronized`,
+          data: subscription,
+        };
+        break;
+      }
+
+      case "invoice.payment_failed": {
+        responseData = await SubscriptionService.handlePaymentFailed(
+          event.data.object as Stripe.Invoice,
         );
         break;
+      }
 
-      case "invoice.payment_failed":
-        responseData = await handlePaymentFailed(
-          event.data.object as Stripe.Invoice
-        );
-        break;
-
-      default:
-        console.log(`Unhandled event type ${event.type}`);
+      default: {
         responseData = {
           statusCode: StatusCodes.OK,
           success: true,
           message: `Unhandled event type ${event.type}`,
           data: null,
         };
+      }
     }
 
-    return sendResponse(res, responseData);
+    // Webhook events return different payload shapes (subscription documents,
+    // payment-failure summaries, or null), so do not let one event narrow the
+    // response data type for all webhook branches.
+    return sendResponse(res, responseData as any);
   } catch (err: any) {
     console.error("Webhook handler error:", err);
     return sendResponse(res, {
@@ -284,8 +369,13 @@ export const SubscriptionController = {
      updateSubscription,
      cancelSubscription,
      getMonthlyRevenueController,
+     getSalesSummaryController,
      // orderSuccess,
      orderCancel,
-     monthlyEarningsStats,
+    //  monthlyEarningsStats,
+    getStripeSalesSummaryController,
+    createBillingPortalSession,
+    stripeWebhookHandler,
+    checkoutSuccessController,
   
 };

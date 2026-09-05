@@ -3,24 +3,12 @@ import { NextFunction, Request, Response } from "express";
 import  jwt  from 'jsonwebtoken';
 import { config } from "../config";
 import { User } from "../modules/auth/user.model";
-import { Role } from "../modules/auth/user.interface";
 
 
 interface AuthenticatedRequest extends Request {
   user?:any
 }
 
-export const isAdminOrSuperAdmin = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  const role = (req.user as any)?.role;
-  if (role !== Role.ADMIN && role !== Role.SUPER_ADMIN) {
-    return res.status(403).json({ message: "Forbidden" });
-  }
-  next();
-};
 
 
 export const auth= async(req:AuthenticatedRequest, res:Response, next:NextFunction) => {
@@ -39,14 +27,13 @@ export const auth= async(req:AuthenticatedRequest, res:Response, next:NextFuncti
     req.user = {
         id: user._id,
         role: user.role,
-        name: `${user.firstName} ${user.lastName}`.trim()
+        // name: `${user.firstName} ${user.lastName}`.trim()
     }
     next();
   } catch (error) {
     return res.status(403).json({ message: "Invalid token" });
   }
 }
-
 
 
 
@@ -57,6 +44,32 @@ export const isAdmin = (req:AuthenticatedRequest, res:Response, next:NextFunctio
     next();
 };
 
+
+export const isSuperAdmin = ( req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  if (req.user?.role !== "SUPER_ADMIN") {
+    return res.status(403).json({
+      success: false,
+      message: "Super admin access is required",
+    });
+  }
+  next();
+};
+
+export const isAdminOrSuperAdmin = (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ) => {
+    const role = req.user?.role;
+
+    if (role !== "ADMIN" && role !== "SUPER_ADMIN") {
+      return res.status(403).json({
+        success: false,
+        message: "Admin access is required",
+      });
+    }
+  next();
+};
 
 
 

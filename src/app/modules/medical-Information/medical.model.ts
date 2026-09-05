@@ -1,34 +1,19 @@
+import { Schema, model } from "mongoose";
 
-// for mongoose model
+const MedicalInfoSchema = new Schema(
+  {
+    healthInsurance: { type: String, trim: true, default: "" },
+    supplementalInsuranceProvider: { type: String, trim: true, default: "" },
+    emergencyContact: { type: String, trim: true, default: "" },
+    allergies: { type: String, default: "" },
+    medications: { type: String, default: "" },
+    hospitalPreference: { type: String, trim: true, default: "" },
+    hospitalLocation: { type: String, default: "" },
+    knownAilments: { type: String, default: "" },
 
-import { model, Schema, Types } from 'mongoose'
-import { MEDICAL } from './medical.interface';
+    userID: { type: Schema.Types.ObjectId, ref: "User", required: true, unique: true },
+  },
+  { timestamps: true, versionKey: false }
+);
 
-
-
-const medicalSchema =  new Schema<MEDICAL>({
-     healthInsurance: {
-      type: String,
-     
-    },
-    supplementalInsurance: {
-      type: String,
-     
-    },
-    medications: {
-      type: String,
-     
-    },
-    knownAilments: {
-      type: String,
-     
-    },
-    medicalsPercentage: { type: Number },
-    
-    userID: { type: Types.ObjectId,   ref: 'User', required: true},
-
-    },{
-    timestamps: true , versionKey: false
-})
-
-export const MedicalModel = model<MEDICAL>("medicals", medicalSchema);
+export const MedicalInfoModel = model("MedicalInfo", MedicalInfoSchema);
