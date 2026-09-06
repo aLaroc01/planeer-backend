@@ -43,9 +43,9 @@ app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
 const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  process.env.LOCAL_FRONTEND_URL,
-].filter(Boolean);
+  "https://planeer-frontend.vercel.app",
+  "http://localhost:5173",
+];
 
 app.use(
   cors({
