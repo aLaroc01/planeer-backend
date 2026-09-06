@@ -12,7 +12,7 @@ router.post("/profile/create", auth, createProfile);
 router.post("/profile/update", auth, UpdateProfile);
 
 // get profile information
-router.get("/GetProfile", auth, GetProfileData);
+router.get("/getProfile", auth, GetProfileData);
 
 router.patch(
   "/profile/suggestions/:key",
