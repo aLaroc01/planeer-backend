@@ -37,9 +37,9 @@ app.post("/api/v1/subscriptions/webhook", express_1.default.raw({ type: "applica
 app.set("view engine", "ejs");
 app.set("views", path_1.default.join(__dirname, "views"));
 const allowedOrigins = [
-    process.env.FRONTEND_URL,
-    process.env.LOCAL_FRONTEND_URL,
-].filter(Boolean);
+    "https://planeer-frontend.vercel.app",
+  "http://localhost:5173",
+]
 app.use((0, cors_1.default)({
     origin: (origin, callback) => {
         // Allows Postman, curl, and server-to-server requests
