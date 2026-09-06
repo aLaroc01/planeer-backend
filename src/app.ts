@@ -43,7 +43,7 @@ app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
 const allowedOrigins = [
-  "https://planeer-frontend.vercel.app",
+  "https://planeer-api-staging.onrender.com",
   "http://localhost:5173",
 ];
 
