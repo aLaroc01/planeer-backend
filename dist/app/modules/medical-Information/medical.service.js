@@ -17,7 +17,7 @@ const MedicalUpdateService = async (req) => {
         const filledFields = allFields.filter(field => field && field.trim() !== "").length;
         const totalFields = allFields.length;
         const completenessPercentage = (filledFields / totalFields) * 100;
-        const updatedMedicalData = await medical_model_1.MedicalModel.findOneAndUpdate({ userID: user_id }, {
+        const updatedMedicalData = await medical_model_1.MedicalInfoModel.findOneAndUpdate({ userID: user_id }, {
             ...requestBody,
             medicalsPercentage: completenessPercentage
         }, { upsert: true, new: true });
@@ -66,13 +66,13 @@ const MedicalGetService = async (req) => {
         if (!user_id) {
             return { status: "failed", message: "Unauthorized" };
         }
-        const financialData = await medical_model_1.MedicalModel.findOne({ userID: user_id }, "-createdAt -updatedAt");
-        if (!financialData) {
-            return { status: "failed", message: "No financial data found" };
+        const medicalData = await medical_model_1.MedicalInfoModel.findOne({ userID: user_id }, "-createdAt -updatedAt");
+        if (!medicalData) {
+            return { status: "failed", message: "No medical data found" };
         }
         return {
             status: "success",
-            data: financialData,
+            data: medicalData,
         };
     }
     catch (error) {

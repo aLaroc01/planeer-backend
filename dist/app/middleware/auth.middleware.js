@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.isCorporate = exports.isAdmin = exports.auth = void 0;
+exports.isCorporate = exports.isAdminOrSuperAdmin = exports.isSuperAdmin = exports.isAdmin = exports.auth = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const config_1 = require("../config");
 const user_model_1 = require("../modules/auth/user.model");
@@ -21,7 +21,7 @@ const auth = async (req, res, next) => {
         req.user = {
             id: user._id,
             role: user.role,
-            name: `${user.firstName} ${user.lastName}`.trim()
+            // name: `${user.firstName} ${user.lastName}`.trim()
         };
         next();
     }
@@ -37,6 +37,27 @@ const isAdmin = (req, res, next) => {
     next();
 };
 exports.isAdmin = isAdmin;
+const isSuperAdmin = (req, res, next) => {
+    if (req.user?.role !== "SUPER_ADMIN") {
+        return res.status(403).json({
+            success: false,
+            message: "Super admin access is required",
+        });
+    }
+    next();
+};
+exports.isSuperAdmin = isSuperAdmin;
+const isAdminOrSuperAdmin = (req, res, next) => {
+    const role = req.user?.role;
+    if (role !== "ADMIN" && role !== "SUPER_ADMIN") {
+        return res.status(403).json({
+            success: false,
+            message: "Admin access is required",
+        });
+    }
+    next();
+};
+exports.isAdminOrSuperAdmin = isAdminOrSuperAdmin;
 const isCorporate = (req, res, next) => {
     if (req.user?.role !== "corporate") {
         return res.status(403).json({ message: "Access denied. Corporate users only." });

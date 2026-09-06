@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.adminUpdateUser = exports.getSystemPerformance = exports.adminLoginController = exports.getUsersWhoSetMyProxy = exports.getUsersWhoAddedMeAsProxyController = exports.getAllUserDataController = exports.getAllOwnUserDataController = exports.UserAnalysisController = exports.getCounts = exports.updateUserController = exports.getNewUsersLast10Days = exports.UserList = exports.forgetPassword = exports.codeverify = exports.AdminEmail = exports.alldatapercentage = exports.getAllProxysetController = exports.ProxysetController = exports.searchUsersController = exports.GetAllProfile = exports.adminDeleteUser = exports.userSelfUpdate = exports.GetProfileData = exports.loginUser = exports.registerUser = void 0;
+exports.adminUpdateUser = exports.getSystemPerformance = exports.adminLoginController = exports.getUsersWhoSetMyProxy = exports.getUsersWhoAddedMeAsProxyController = exports.getAllUserDataController = exports.getAllOwnUserDataController = exports.UserAnalysisController = exports.getCounts = exports.updateUserController = exports.getNewUsersLast10Days = exports.UserList = exports.forgetPassword = exports.codeverify = exports.AdminEmail = exports.getAllProxysetController = exports.ProxysetController = exports.searchUsersController = exports.GetAllProfile = exports.adminDeleteUser = exports.userSelfUpdate = exports.GetProfileData = exports.loginUser = exports.registerUser = void 0;
 const user_service_1 = require("./user.service");
 const user_model_1 = require("./user.model");
 const successLogger_1 = require("../../../helpers/successLogger");
@@ -23,7 +23,7 @@ const registerUser = async (req, res, next) => {
         }
         const token = jsonwebtoken_1.default.sign({ userId: user._id, role: user.role }, index_1.config.jwt_secret, { expiresIn: "1d" });
         (0, successLogger_1.logSuccess)(req, "User registered successfully", { userId: user._id, email: user.email });
-        return res.status(201).json({ success: true, message: "User registered successfully", statusCode: 201, data: { _id: user._id, phoneNumber: user.phoneNumber, email: user.email, role: user.role, userPercentage: user.userPercentage, token: token }, meta: null });
+        return res.status(201).json({ success: true, message: "User registered successfully", statusCode: 201, data: { _id: user._id, phoneNumber: user.phoneNumber, email: user.email, role: user.role, token: token }, meta: null });
     }
     catch (error) {
         next(error);
@@ -57,7 +57,7 @@ const GetProfileData = async (req, res, next) => {
 exports.GetProfileData = GetProfileData;
 const userSelfUpdate = async (req, res) => {
     const result = await (0, user_service_1.userSelfUpdateService)(req);
-    if (result.status === "success") {
+    if (result?.status === "success") {
         (0, successLogger_1.logSuccess)(req, "User updated own profile", {
             userId: req.user?.id,
         });
@@ -148,35 +148,33 @@ exports.getAllProxysetController = getAllProxysetController;
 //     });
 //   }
 // };
-const alldatapercentage = async (req, res) => {
-    try {
-        // ✅ Handle string | string[] safely
-        const userId = Array.isArray(req.params.userId)
-            ? req.params.userId[0]
-            : req.params.userId;
-        const userProfile = await (0, user_service_1.getUserFullProfileService)(userId);
-        // 🔹 Success log
-        (0, successLogger_1.logSuccess)(req, "Fetched full user profile", { userId });
-        if (!userProfile) {
-            return res.status(404).json({
-                success: false,
-                message: "User not found",
-            });
-        }
-        return res.status(200).json({
-            success: true,
-            data: userProfile,
-        });
-    }
-    catch (error) {
-        console.error("Error fetching user profile:", error);
-        return res.status(500).json({
-            success: false,
-            message: "Internal Server Error",
-        });
-    }
-};
-exports.alldatapercentage = alldatapercentage;
+// export const alldatapercentage = async (req: Request, res: Response) => {
+//   try {
+//     // ✅ Handle string | string[] safely
+//     const userId: string = Array.isArray(req.params.userId)
+//       ? req.params.userId[0]
+//       : req.params.userId;
+//     const userProfile = await getUserFullProfileService(userId);
+//     // 🔹 Success log
+//     logSuccess(req, "Fetched full user profile", { userId });
+//     if (!userProfile) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "User not found",
+//       });
+//     }
+//     return res.status(200).json({
+//       success: true,
+//       data: userProfile,
+//     });
+//   } catch (error) {
+//     console.error("Error fetching user profile:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//     });
+//   }
+// };
 // Example: Admin Email
 const AdminEmail = async (req, res, next) => {
     try {
@@ -445,6 +443,13 @@ exports.getAllUserDataController = getAllUserDataController;
 const getUsersWhoAddedMeAsProxyController = async (req, res) => {
     try {
         const myUserId = req.user?.id;
+        if (!myUserId) {
+            res.status(401).json({
+                success: false,
+                message: "Unauthorized"
+            });
+            return;
+        }
         const users = await (0, user_service_1.getUsersWhoAddedMeAsProxyService)(myUserId);
         res.status(200).json({
             success: true,
@@ -575,7 +580,7 @@ const getSystemPerformance = async (req, res, next) => {
 exports.getSystemPerformance = getSystemPerformance;
 const adminUpdateUser = async (req, res) => {
     const result = await (0, user_service_1.adminUpdateUserService)(req);
-    if (result.status === "success") {
+    if (result?.status === "success") {
         (0, successLogger_1.logSuccess)(req, "Admin updated user data", {
             adminId: req.user?.id,
             updatedUserId: req.params.id,

@@ -1,24 +1,16 @@
 "use strict";
-// for mongoose model
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MedicalModel = void 0;
+exports.MedicalInfoModel = void 0;
 const mongoose_1 = require("mongoose");
-const medicalSchema = new mongoose_1.Schema({
-    healthInsurance: {
-        type: String,
-    },
-    supplementalInsurance: {
-        type: String,
-    },
-    medications: {
-        type: String,
-    },
-    knownAilments: {
-        type: String,
-    },
-    medicalsPercentage: { type: Number },
-    userID: { type: mongoose_1.Types.ObjectId, ref: 'User', required: true },
-}, {
-    timestamps: true, versionKey: false
-});
-exports.MedicalModel = (0, mongoose_1.model)("medicals", medicalSchema);
+const MedicalInfoSchema = new mongoose_1.Schema({
+    healthInsurance: { type: String, trim: true, default: "" },
+    supplementalInsuranceProvider: { type: String, trim: true, default: "" },
+    emergencyContact: { type: String, trim: true, default: "" },
+    allergies: { type: String, default: "" },
+    medications: { type: String, default: "" },
+    hospitalPreference: { type: String, trim: true, default: "" },
+    hospitalLocation: { type: String, default: "" },
+    knownAilments: { type: String, default: "" },
+    userID: { type: mongoose_1.Schema.Types.ObjectId, ref: "User", required: true, unique: true },
+}, { timestamps: true, versionKey: false });
+exports.MedicalInfoModel = (0, mongoose_1.model)("MedicalInfo", MedicalInfoSchema);

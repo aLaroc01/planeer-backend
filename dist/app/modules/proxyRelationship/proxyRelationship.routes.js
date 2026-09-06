@@ -1,0 +1,14 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const proxyRelationship_controller_1 = require("./proxyRelationship.controller");
+const router = (0, express_1.Router)();
+router.post("/", proxyRelationship_controller_1.createProxyRelationship);
+router.get("/", proxyRelationship_controller_1.getProxyRelationships);
+router.get("/:id", proxyRelationship_controller_1.getProxyRelationshipById);
+router.put("/:id", proxyRelationship_controller_1.updateProxyRelationship);
+router.delete("/:id", proxyRelationship_controller_1.deleteProxyRelationship);
+router.post("/:id/request-release", proxyRelationship_controller_1.requestEmergencyRelease);
+router.post("/:id/review-release", proxyRelationship_controller_1.reviewEmergencyRelease);
+router.post("/:id/revoke-release", proxyRelationship_controller_1.revokeEmergencyRelease);
+exports.default = router;

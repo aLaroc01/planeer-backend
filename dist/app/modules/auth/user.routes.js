@@ -20,7 +20,7 @@ router.put("/ProfileUpdate", auth_middleware_1.auth, user_controller_1.userSelfU
 router.get("/GetAllProfile", auth_middleware_1.auth, user_controller_1.GetAllProfile);
 // GET request route for search
 router.get("/search", auth_middleware_1.auth, user_controller_1.searchUsersController);
-router.get("/alldata-percentage/:userId", auth_middleware_1.auth, user_controller_1.alldatapercentage);
+// router.get("/alldata-percentage/:userId",auth, alldatapercentage);
 // proxyset user
 router.post("/proxyset/:proxysetId", auth_middleware_1.auth, user_controller_1.ProxysetController);
 router.get("/getAllProxyset/:id", auth_middleware_1.auth, user_controller_1.getAllProxysetController);
