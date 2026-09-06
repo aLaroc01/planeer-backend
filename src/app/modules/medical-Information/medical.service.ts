@@ -90,13 +90,6 @@ export const calculateMedicalDataCompleteness = async (req: Request, res: Respon
 
 
 
-
-
-
-
-
-
-
 export const MedicalGetService = async (req: Request) => {
   try {
 
@@ -107,18 +100,18 @@ export const MedicalGetService = async (req: Request) => {
     }
 
 
-    const financialData = await MedicalInfoModel.findOne(
+    const medicalData = await MedicalInfoModel.findOne(
       { userID: user_id },
       "-createdAt -updatedAt"
     );
 
-    if (!financialData) {
-      return { status: "failed", message: "No financial data found" };
+    if (!medicalData) {
+      return { status: "failed", message: "No medical data found" };
     }
 
     return {
       status: "success",
-      data: financialData,
+      data: medicalData,
     };
   } catch (error: any) {
     return { status: "failed", message: error.message };
