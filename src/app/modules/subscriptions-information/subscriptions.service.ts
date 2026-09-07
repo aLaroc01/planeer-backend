@@ -790,13 +790,13 @@ export const checkActiveSubscription = async (userId: string) => {
     { currentPeriodEnd: 1 },
   ).sort({ currentPeriodEnd: -1 });
 
-  if (!subscription) {
-    return false;
-  }
+//   if (!subscription) {
+//     return false;
+//   }
 
-  if (!subscription.currentPeriodEnd || new Date() > subscription.currentPeriodEnd) {
-    return false;
-  }
+//   if (!subscription.currentPeriodEnd || new Date() > subscription.currentPeriodEnd) {
+//     return false;
+//   }
 
   return true;
 };
