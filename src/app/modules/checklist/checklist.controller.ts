@@ -69,26 +69,26 @@ export const getChecklistByUser = async (
     const requesterId = req.user?.id;
     const checklistOwnerId = req.params.id;
 
-    if (!requesterId) {
-      return res.status(401).json({
-        status: "failed",
-        message: "Unauthorized",
-      });
-    }
+    // if (!requesterId) {
+    //   return res.status(401).json({
+    //     status: "failed",
+    //     message: "Unauthorized",
+    //   });
+    // }
 
-    if (!mongoose.Types.ObjectId.isValid(requesterId)) {
-      return res.status(401).json({
-        status: "failed",
-        message: "Invalid authenticated user ID",
-      });
-    }
+    // if (!mongoose.Types.ObjectId.isValid(requesterId)) {
+    //   return res.status(401).json({
+    //     status: "failed",
+    //     message: "Invalid authenticated user ID",
+    //   });
+    // }
 
-    if (!mongoose.Types.ObjectId.isValid(checklistOwnerId)) {
-      return res.status(400).json({
-        status: "failed",
-        message: "Invalid checklist owner ID",
-      });
-    }
+    // if (!mongoose.Types.ObjectId.isValid(checklistOwnerId)) {
+    //   return res.status(400).json({
+    //     status: "failed",
+    //     message: "Invalid checklist owner ID",
+    //   });
+    // }
 
     // Normalize to strings for safe comparison
     const requesterIdStr = String(requesterId);
@@ -98,30 +98,30 @@ export const getChecklistByUser = async (
     console.log("Checklist Owner ID:", checklistOwnerIdStr);
 
     // Permission check: only owner for now
-    if (requesterIdStr !== checklistOwnerIdStr) {
-      return res.status(403).json({
-        status: "failed",
-        message: "You do not have permission to view this checklist",
-      });
-    }
+    // if (requesterIdStr !== checklistOwnerIdStr) {
+    //   return res.status(403).json({
+    //     status: "failed",
+    //     message: "You do not have permission to view this checklist",
+    //   });
+    // }
 
-    // Only fetch if authorized
-    const result = await checklistService.getChecklistByUserService(
-      checklistOwnerIdStr
-    );
+    // // Only fetch if authorized
+    // const result = await checklistService.getChecklistByUserService(
+    //   checklistOwnerIdStr
+    // );
 
-    if (!result) {
-      return res.status(404).json({
-        status: "failed",
-        message: "Checklist not found",
-        data: null,
-      });
-    }
+    // if (!result) {
+    //   return res.status(404).json({
+    //     status: "failed",
+    //     message: "Checklist not found",
+    //     data: null,
+    //   });
+    // }
 
     return res.status(200).json({
       status: "success",
       message: "Checklist fetched successfully",
-      data: result,
+      // data: result,
     });
   } catch (error: any) {
     return res.status(500).json({
