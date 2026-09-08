@@ -9,7 +9,7 @@ const checklist_controller_1 = require("./checklist.controller");
 const auth_middleware_1 = require("./../../middleware/auth.middleware");
 const router = express_1.default.Router();
 router.post("/createChecklist", auth_middleware_1.auth, checklist_controller_1.createChecklist);
-router.get("/getChecklist/:id", auth_middleware_1.auth, checklist_controller_1.getChecklistByUser);
+router.get("/getChecklist", auth_middleware_1.auth, checklist_controller_1.getChecklistByUser);
 router.patch("/checklistUpdate/:id", auth_middleware_1.auth, checklist_controller_1.updateChecklist);
 router.delete("/checklistDelete/:id", auth_middleware_1.auth, checklist_controller_1.deleteChecklist);
 exports.ChecklistRoutes = router;

@@ -13,6 +13,6 @@ router.post("/profile/create", auth_middleware_1.auth, profile_controller_1.crea
 // update profile information
 router.post("/profile/update", auth_middleware_1.auth, profile_controller_1.UpdateProfile);
 // get profile information
-router.get("/GetProfile", auth_middleware_1.auth, profile_controller_1.GetProfileData);
+router.get("/getProfile", auth_middleware_1.auth, profile_controller_1.GetProfileData);
 router.patch("/profile/suggestions/:key", auth_middleware_1.auth, profile_controller_1.updateSuggestionStatus);
 exports.profileRoutes = router;

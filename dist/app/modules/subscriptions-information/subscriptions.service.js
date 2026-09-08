@@ -606,12 +606,12 @@ const subscriptionsFromDB = async (query) => {
 //  */
 const checkActiveSubscription = async (userId) => {
     const subscription = await subscriptions_model_1.Subscription.findOne({ userId, status: 'active' }, { currentPeriodEnd: 1 }).sort({ currentPeriodEnd: -1 });
-    if (!subscription) {
-        return false;
-    }
-    if (!subscription.currentPeriodEnd || new Date() > subscription.currentPeriodEnd) {
-        return false;
-    }
+    //   if (!subscription) {
+    //     return false;
+    //   }
+    //   if (!subscription.currentPeriodEnd || new Date() > subscription.currentPeriodEnd) {
+    //     return false;
+    //   }
     return true;
 };
 exports.checkActiveSubscription = checkActiveSubscription;

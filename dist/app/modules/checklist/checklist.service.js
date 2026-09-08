@@ -19,8 +19,9 @@ class ChecklistService {
             runValidators: true,
         });
     };
-    getChecklistByUser = async (userId) => {
-        return checklist_model_1.default.findOne({ userId });
+    getChecklistByUserService = async (userId) => {
+        const checklist = await checklist_model_1.default.findOne({ userId }).lean();
+        return checklist || null;
     };
     updateChecklistByUser = async (userId, payload) => {
         return checklist_model_1.default.findOneAndUpdate({ userId }, {

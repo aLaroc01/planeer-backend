@@ -38,8 +38,8 @@ app.set("view engine", "ejs");
 app.set("views", path_1.default.join(__dirname, "views"));
 const allowedOrigins = [
     "https://planeer-frontend.vercel.app",
-  "http://localhost:5173",
-]
+    "http://localhost:5173",
+];
 app.use((0, cors_1.default)({
     origin: (origin, callback) => {
         // Allows Postman, curl, and server-to-server requests
@@ -147,3 +147,4 @@ app.get("/test-error", (req, res) => {
     throw new Error("This is a test error");
 });
 exports.default = app; // trigger redeploy
+// trigger redeploy
