@@ -10,7 +10,7 @@ import { auth } from './../../middleware/auth.middleware';
 const router = express.Router();
 
 router.post("/createChecklist", auth, createChecklist);
-router.get("/getChecklist/:id", auth, getChecklistByUser);
+router.get("/getChecklist", auth, getChecklistByUser);
 router.patch("/checklistUpdate/:id", auth, updateChecklist);
 router.delete("/checklistDelete/:id", auth, deleteChecklist);
 
