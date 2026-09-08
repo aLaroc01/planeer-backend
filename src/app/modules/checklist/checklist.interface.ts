@@ -16,6 +16,8 @@ export interface CHECKLIST {
   instructions: string;
   status: ChecklistStatus;
   userID: string;
+  primaryProxyId?: String;
+  secondaryProxyId?: String;
   createdAt?: Date;
   updatedAt?: Date;
 }

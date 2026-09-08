@@ -9,6 +9,8 @@ import { populate } from "dotenv";
 import { connection, connections } from "mongoose";
 import { Schema } from "zod";
 import { profile } from "console";
+import Checklist from "../checklist/checklist.model";
+import mongoose from "mongoose";
 
 /**
  * Helper: normalize email from body
@@ -533,7 +535,7 @@ export const denyProxyDirectService = async (req: Request) => {
     if (!proxyId) {
       return { status: "failed", message: "Unauthorized" };
     }
-try {
+  try {
     const connection = await Connection.findOneAndUpdate(
       { proxyUserId: proxyId,
          _id: connectionId,
@@ -570,80 +572,128 @@ export const acceptProxyDirectService = async (req: Request) => {
     if (!proxyId) {
       return { status: "failed", message: "Unauthorized" };
     }
-try {
-    const connection = await Connection.findOneAndUpdate(
-      { proxyUserId: proxyId,
-         _id: connectionId,
-       }, // find the connection where this user is the proxy
-      {
-        $set: {
-          status: "active",
-          acceptedAt: new Date(), 
+
+    if (!connectionId || !mongoose.Types.ObjectId.isValid(connectionId)) {
+      return { status: "failed", message: "Invalid connection ID" };
+    }
+
+    try {
+      const connection = await Connection.findOneAndUpdate(
+        {
+          proxyUserId: new mongoose.Types.ObjectId(proxyId),
+          _id: new mongoose.Types.ObjectId(connectionId),
         },
-      },
-    );
-    return {
+        {
+          $set: {
+            status: "active",
+            acceptedAt: new Date(),
+          },
+        },
+        { new: true }
+      );
+
+      if (!connection) {
+        return {
+          status: "failed",
+          message: "Connection not found",
+        };
+      }
+
+      const grantorId = connection.grantorId.toString();
+      const proxyIdStr = connection.proxyUserId.toString();
+
+      // Count active proxies for this grantor
+      const activeConnections = await Connection.find({
+        grantorId: new mongoose.Types.ObjectId(grantorId),
+        status: "active",
+        acceptedAt: { $exists: true, $ne: null },
+      })
+        .sort({ acceptedAt: 1 })
+        .select("proxyUserId proxyRole acceptedAt")
+        .lean();
+
+      // Enforce max 2 proxies
+      if (activeConnections.length > 2) {
+        // Revert this connection to non-active or just reject
+        await Connection.findByIdAndUpdate(connection._id, {
+          $set: { status: "pending" }, // or "rejected" / "disabled" as you prefer
+        });
+
+        return {
+          status: "failed",
+          message: "Maximum of 2 proxies allowed",
+        };
+      }
+
+      // Assign proxyRole based on order
+      const existingPrimary = activeConnections.find(c => c.proxyRole === "primary");
+      const existingSecondary = activeConnections.find(c => c.proxyRole === "secondary");
+
+      let assignedRole: "primary" | "secondary" = "primary";
+
+      if (!existingPrimary) {
+        assignedRole = "primary";
+      } else if (!existingSecondary) {
+        assignedRole = "secondary";
+      } else {
+        // Both already assigned; this should not happen due to the >2 check,
+        // but if it does, reject.
+        await Connection.findByIdAndUpdate(connection._id, {
+          $set: { status: "pending" },
+        });
+        return {
+          status: "failed",
+          message: "Maximum of 2 proxies allowed",
+        };
+      }
+
+      // Set proxyRole on this connection
+      await Connection.findByIdAndUpdate(connection._id, {
+        $set: { proxyRole: assignedRole },
+      });
+
+      // Update checklist (if exists)
+      const existingChecklist = await Checklist.findOne({
+        userId: new mongoose.Types.ObjectId(grantorId),
+      });
+
+      if (!existingChecklist) {
+        return {
+          status: "success",
+          message: "Proxy connection accepted!",
+          data: { connection },
+        };
+      }
+
+      const primaryProxyId =
+        activeConnections.find(c => c.proxyRole === "primary")?.proxyUserId?.toString() || null;
+
+      const secondaryProxyId =
+        activeConnections.find(c => c.proxyRole === "secondary")?.proxyUserId?.toString() || null;
+
+      const updatedChecklist = await Checklist.findOneAndUpdate(
+        { userId: new mongoose.Types.ObjectId(grantorId) },
+        {
+          primaryProxyId: primaryProxyId ? new mongoose.Types.ObjectId(primaryProxyId) : null,
+          secondaryProxyId: secondaryProxyId ? new mongoose.Types.ObjectId(secondaryProxyId) : null,
+        },
+        { new: true }
+      );
+
+      return {
         status: "success",
         message: "Proxy connection accepted!",
-        data: connection,
+        data: {
+          connection,
+          checklist: updatedChecklist,
+        },
       };
-  } catch (error: any) {
-    return {
-      status: "failed",
-      message: error.message || "Failed to update your connection",
-    };
-  }
-};
-
-
-
-// update user connection information service
-export const updateConnectionProxyService = async (req: Request) => {
-  try {
-    const proxyId = req.user?._id;
-
-    if (!proxyId) {
-      return { status: "failed", message: "Unauthorized" };
-    }
-
-    console.log("updateConnectionProxyService req.user:", req.user);
-
-    const connection = await Connection.findOneAndUpdate(
-      { proxyUserId: proxyId }, // find the connection where this user is the proxy
-      {
-        $set: {
-          status: "active",
-          acceptedAt: new Date(),
-          proxyUserId: proxyId, // ensure proxyUserId is set in case it was null before 
-        },
-        $unset: {
-          otp: 1,
-          otpExpiresAt: 1,
-          otpPurpose: 1,
-          releaseStatus: 1, // TODO: adjust later if needed
-        },
-      },
-      { new: true }
-    );
-
-    if (!connection) {
+    } catch (error: any) {
       return {
         status: "failed",
-        message: "No connection found for this proxy user",
+        message: error.message || "Failed to update your connection",
       };
     }
-
-    return {
-      status: "success",
-      message: "Proxy connection updated successfully",
-      data: connection,
-    };
-  } catch (error: any) {
-    return {
-      status: "failed",
-      message: error.message || "Failed to update your connection",
-    };
-  }
 };
 
 

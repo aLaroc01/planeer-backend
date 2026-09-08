@@ -12,6 +12,8 @@ export interface IChecklistItem {
 
 export interface IChecklist extends Document {
   userId: Types.ObjectId;
+  primaryProxyId?: Types.ObjectId;
+  secondaryProxyId?: Types.ObjectId;
   items: IChecklistItem[];
   createdAt?: Date;
   updatedAt?: Date;
@@ -43,6 +45,16 @@ const ChecklistSchema = new Schema<IChecklist>(
       required: true,
       unique: true,
       index: true,
+    },
+    primaryProxyId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null, // or omit to mean “no primary proxy”
+    },
+    secondaryProxyId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null, // or omit to mean “no secondary proxy”
     },
     items: {
       type: [ChecklistItemSchema],
