@@ -94,6 +94,9 @@ export const getChecklistByUser = async (
     const requesterIdStr = String(requesterId);
     const checklistOwnerIdStr = String(checklistOwnerId);
 
+    console.log("Requester ID:", requesterIdStr);
+    console.log("Checklist Owner ID:", checklistOwnerIdStr);
+
     // Permission check: only owner for now
     if (requesterIdStr !== checklistOwnerIdStr) {
       return res.status(403).json({
