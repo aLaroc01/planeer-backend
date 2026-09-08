@@ -110,7 +110,7 @@ export const getChecklistByUser = async (
         status: "active",
       });
 
-      if (!activeConnection) {
+      if (requesterId !== checklistOwnerId ) {
         return res.status(403).json({
           status: "failed",
           message: "You do not have permission to view this checklist",
