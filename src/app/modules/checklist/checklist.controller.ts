@@ -91,8 +91,17 @@ export const getChecklistByUser = async (
     }
 
     const isOwner = requesterId === checklistOwnerId;
+    const result = await checklistService.getChecklistByUserService(requesterId);
 
-    // Owners can always view their own checklist
+    if (!result) {
+      return res.status(404).json({
+        status: "failed",
+        message: "Checklist not found",
+        data: null,
+      });
+    }
+
+    
     if (!isOwner) {
       // Non-owners must have an active connection
       const activeConnection = await Connection.exists({
@@ -107,20 +116,6 @@ export const getChecklistByUser = async (
           message: "You do not have permission to view this checklist",
         });
       }
-    }
-
-    const result = await checklistService.getChecklistByUser(requesterId);
-
-    console.log("requesterId:", requesterId, typeof requesterId);
-    console.log("checklistOwnerId:", checklistOwnerId, typeof checklistOwnerId);
-    console.log("isOwner:", isOwner);
-    
-    if (!result) {
-      return res.status(404).json({
-        status: "failed",
-        message: "Checklist not found",
-        data: null,
-      });
     }
 
     return res.status(200).json({

@@ -26,11 +26,11 @@ export default class ChecklistService {
   };
   
 
-  public getChecklistByUser = async (userId: string) => {
+  public getChecklistByUserService = async (userId: string) => {
     const checklist = await Checklist.findOne({ userId }).lean();
     return checklist || null;
   };
-  
+
 
   public updateChecklistByUser = async (
     userId: string,
