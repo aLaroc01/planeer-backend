@@ -109,8 +109,12 @@ export const getChecklistByUser = async (
       }
     }
 
-    const result = await checklistService.getChecklistByUser(checklistOwnerId);
+    const result = await checklistService.getChecklistByUser(requesterId);
 
+    console.log("requesterId:", requesterId, typeof requesterId);
+    console.log("checklistOwnerId:", checklistOwnerId, typeof checklistOwnerId);
+    console.log("isOwner:", isOwner);
+    
     if (!result) {
       return res.status(404).json({
         status: "failed",

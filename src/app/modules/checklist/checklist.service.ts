@@ -24,10 +24,13 @@ export default class ChecklistService {
       }
     );
   };
+  
 
   public getChecklistByUser = async (userId: string) => {
-    return Checklist.findOne({ userId });
+    const checklist = await Checklist.findOne({ userId }).lean();
+    return checklist || null;
   };
+  
 
   public updateChecklistByUser = async (
     userId: string,
