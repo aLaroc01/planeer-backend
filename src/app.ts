@@ -1,117 +1,161 @@
-import express, { Request, Response } from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
+import express, { NextFunction, Request, Response } from "express";
+import cors, { CorsOptions } from "cors";
+import helmet from "helmet";
 import path from "path";
-import rateLimit from 'express-rate-limit';
-import { userRoutes } from './app/modules/auth/user.routes';
-import errorHandler from './app/middleware/errorHandler';
-import { financialRoutes } from './app/modules/financial-Information/financial.routes';
-import { medicalRoutes } from './app/modules/medical-Information/medical.routes';
-import { socialRoutes } from './app/modules/social-Information/social.routes';
-import { personalRoutes } from './app/modules/personal-Information/personal.routes';
-import { homeautoRoutes } from './app/modules/homeAuto-Information/homeauto.routes';
-import { ReportRoutes } from './app/modules/report-Information/report.routes';
-import { PackageRoutes } from './app/modules/package/package.routes';
-import { SubscriptionRoutes } from './app/modules/subscriptions-information/subscriptions.routes';
-import { startSubscriptionExpireCron } from './app/modules/subscriptions-information/subscriptionExpire.cron';
-import { requestLogger } from './helpers/requestLogger';
+import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
-import { profileRoutes } from './app/modules/Profile-Information/profile.routes';
-import { ReviewRoutes } from './app/modules/reviews/reviews.routes';
-import connectionRoutes  from './app/modules/connections/connection.routes';
-// express-fileupload does not ship TypeScript declarations.
-// @ts-expect-error -- the package is used as middleware at runtime.
-import fileUpload from 'express-fileupload';
-import { AuditLogRoutes } from './app/modules/audit-log/auditLog.routes';
+
+// Routes
+import { userRoutes } from "./app/modules/auth/user.routes";
+import { financialRoutes } from "./app/modules/financial-Information/financial.routes";
+import { medicalRoutes } from "./app/modules/medical-Information/medical.routes";
+import { socialRoutes } from "./app/modules/social-Information/social.routes";
+import { personalRoutes } from "./app/modules/personal-Information/personal.routes";
+import { homeautoRoutes } from "./app/modules/homeAuto-Information/homeauto.routes";
+import { ReportRoutes } from "./app/modules/report-Information/report.routes";
+import { PackageRoutes } from "./app/modules/package/package.routes";
+import { SubscriptionRoutes } from "./app/modules/subscriptions-information/subscriptions.routes";
+import { profileRoutes } from "./app/modules/Profile-Information/profile.routes";
+import { ReviewRoutes } from "./app/modules/reviews/reviews.routes";
+import connectionRoutes from "./app/modules/connections/connection.routes";
+import { AuditLogRoutes } from "./app/modules/audit-log/auditLog.routes";
 import { SupportRoutes } from "./app/modules/support/support.routes";
 import { ChecklistRoutes } from "./app/modules/checklist/checklist.routes";
-import { SubscriptionController } from './app/modules/subscriptions-information/subscriptions.controller';
+
+// Controllers / middleware / helpers
+import { SubscriptionController } from "./app/modules/subscriptions-information/subscriptions.controller";
+import { startSubscriptionExpireCron } from "./app/modules/subscriptions-information/subscriptionExpire.cron";
+import errorHandler from "./app/middleware/errorHandler";
+import { requestLogger } from './helpers/requestLogger';
+
+// express-fileupload does not ship TypeScript declarations.
+// @ts-expect-error -- package is used as runtime Express middleware.
+import fileUpload from "express-fileupload";
 
 dotenv.config();
 
-
 const app = express();
 
+/*
+|--------------------------------------------------------------------------
+| Stripe webhook
+|--------------------------------------------------------------------------
+| Stripe requires the unparsed raw request body. This must remain before
+| express.json(), otherwise webhook signature verification can break.
+|--------------------------------------------------------------------------
+*/
 app.post(
   "/api/v1/subscriptions/webhook",
   express.raw({ type: "application/json" }),
-  SubscriptionController.stripeWebhookHandler,
+  SubscriptionController.stripeWebhookHandler
 );
 
+/*
+|--------------------------------------------------------------------------
+| App settings
+|--------------------------------------------------------------------------
+*/
 app.set("view engine", "ejs");
-
 app.set("views", path.join(__dirname, "views"));
 
+/*
+|--------------------------------------------------------------------------
+| CORS — must run before normal middleware, auth, rate limiting, and routes
+|--------------------------------------------------------------------------
+*/
 const allowedOrigins = [
   "https://planeer-frontend.vercel.app",
   "http://localhost:5173",
 ];
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allows Postman, curl, and server-to-server requests
-      if (!origin) {
-        return callback(null, true);
-      }
+const corsOptions: CorsOptions = {
+  origin: (origin, callback) => {
+    // Allows curl, Postman, Render checks, and server-to-server calls.
+    if (!origin) {
+      return callback(null, true);
+    }
 
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
 
-      return callback(
-        new Error(`CORS blocked this origin: ${origin}`),
-      );
-    },
-    credentials: true,
-    methods: [
-      "GET",
-      "POST",
-      "PUT",
-      "PATCH",
-      "DELETE",
-      "OPTIONS",
-    ],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-    ],
-  }),
-);
+    return callback(new Error(`CORS blocked this origin: ${origin}`));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  maxAge: 86400,
+  optionsSuccessStatus: 204,
+};
 
+app.use(cors(corsOptions));
+
+// Explicitly finish all CORS preflights before they reach rate limits,
+// IP rules, file uploads, auth middleware, or API routes.
+app.options(/.*/, cors(corsOptions));
+
+/*
+|--------------------------------------------------------------------------
+| Body parsing and security
+|--------------------------------------------------------------------------
+*/
 app.use(express.json({ limit: "50mb" }));
-// app.use(cors());
+
 app.use(
   helmet({
     crossOriginEmbedderPolicy: false,
   })
 );
-const limiter = rateLimit({windowMs: 20 * 60 * 1000, max: 100, });
+
+/*
+|--------------------------------------------------------------------------
+| Rate limiting and request logging
+|--------------------------------------------------------------------------
+*/
+const limiter = rateLimit({
+  windowMs: 20 * 60 * 1000,
+  max: 100,
+});
+
 app.use(limiter);
 app.use(requestLogger);
 
+/*
+|--------------------------------------------------------------------------
+| File uploads
+|--------------------------------------------------------------------------
+*/
 app.use(
   fileUpload({
     createParentPath: true,
   })
 );
 
+/*
+|--------------------------------------------------------------------------
+| Optional IP allowlist
+|--------------------------------------------------------------------------
+*/
 const allowedIPs = (process.env.ALLOWED_TEST_IPS || "")
   .split(",")
   .map((ip) => ip.trim())
   .filter(Boolean);
 
-app.use((req, res, next) => {
-  // Get the real client IP. Behind Render, use x-forwarded-for.
+app.use((req: Request, res: Response, next: NextFunction) => {
+  // CORS preflight must never be blocked here.
+  if (req.method === "OPTIONS") {
+    return next();
+  }
+
+  // If no IP list is configured, allow all requests.
+  if (allowedIPs.length === 0) {
+    return next();
+  }
+
   const forwarded = req.headers["x-forwarded-for"];
   const ip = forwarded
     ? forwarded.toString().split(",")[0].trim()
     : req.socket.remoteAddress || "";
-
-  // If no list is configured, allow everything (safety fallback).
-  if (allowedIPs.length === 0) {
-    return next();
-  }
 
   if (allowedIPs.includes(ip)) {
     return next();
@@ -123,23 +167,24 @@ app.use((req, res, next) => {
   });
 });
 
-// Serve uploaded files
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "")
-  .split(",")
-  .map((o) => o.trim())
-  .filter(Boolean);
-
-app.use("/uploads", (req, res, next) => {
+/*
+|--------------------------------------------------------------------------
+| Uploaded files
+|--------------------------------------------------------------------------
+*/
+app.use("/uploads", (req: Request, res: Response, next: NextFunction) => {
   const origin = req.headers.origin;
 
-  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+  if (origin && allowedOrigins.includes(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
   }
 
   res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
-  next();
+
+  return next();
 });
 
 app.use(
@@ -147,15 +192,29 @@ app.use(
   express.static(path.join(process.cwd(), "uploads"), {
     setHeaders: (res: Response) => {
       res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-      res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
     },
   })
 );
 
+/*
+|--------------------------------------------------------------------------
+| Health check
+|--------------------------------------------------------------------------
+| Use this for a lightweight service-status check and potential keep-alive.
+|--------------------------------------------------------------------------
+*/
+app.get("/health", (_req: Request, res: Response) => {
+  return res.status(200).json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+  });
+});
 
-//routes
-
+/*
+|--------------------------------------------------------------------------
+| API routes
+|--------------------------------------------------------------------------
+*/
 app.use("/api/v1", userRoutes);
 app.use("/api/v1", financialRoutes);
 app.use("/api/v1", medicalRoutes);
@@ -172,24 +231,31 @@ app.use("/api/v1/audit-logs", AuditLogRoutes);
 app.use("/api/v1", SupportRoutes);
 app.use("/api/v1", ChecklistRoutes);
 
-app.use(express.json());
-
-
-//error handling middleware
- app.use(errorHandler); 
-
-startSubscriptionExpireCron();
-
-
-app.get("/", (req: Request, res: Response) => {
-  res.send("Hello from Vercel!");
+/*
+|--------------------------------------------------------------------------
+| Basic routes
+|--------------------------------------------------------------------------
+*/
+app.get("/", (_req: Request, res: Response) => {
+  return res.send("Hello from Render!");
 });
 
-
-app.get("/test-error", (req, res) => {
+app.get("/test-error", (_req: Request, _res: Response) => {
   throw new Error("This is a test error");
 });
 
+/*
+|--------------------------------------------------------------------------
+| Error handler — must be last
+|--------------------------------------------------------------------------
+*/
+app.use(errorHandler);
 
-export default app;// trigger redeploy
-// trigger redeploy
+/*
+|--------------------------------------------------------------------------
+| Background jobs
+|--------------------------------------------------------------------------
+*/
+startSubscriptionExpireCron();
+
+export default app;
