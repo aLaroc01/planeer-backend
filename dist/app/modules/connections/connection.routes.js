@@ -24,7 +24,7 @@ connectionRoutes.get("/connections/proxy/invite/:token", connection_controller_1
 // Route for proxy user to accept invite after authenticating (called from client after validating token)
 // connectionRoutes.post("/connections/accept-proxy-invite", auth, acceptProxyInvite);
 // Route for proxy user to update information on connections
-connectionRoutes.post("/connections/proxy/update", auth_middleware_1.auth, connection_controller_1.updateConnectionProxyInfo);
+// connectionRoutes.post("/connections/proxy/update", auth, updateConnectionProxyInfo)
 connectionRoutes.post("/connections/:connectionId/request-release", connection_controller_1.requestEmergencyRelease);
 connectionRoutes.post("/connections/:connectionId/verify-release", connection_controller_1.verifyEmergencyRelease);
 exports.default = connectionRoutes;

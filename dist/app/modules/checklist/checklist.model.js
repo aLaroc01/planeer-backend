@@ -56,6 +56,16 @@ const ChecklistSchema = new mongoose_1.Schema({
         unique: true,
         index: true,
     },
+    primaryProxyId: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null, // or omit to mean “no primary proxy”
+    },
+    secondaryProxyId: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null, // or omit to mean “no secondary proxy”
+    },
     items: {
         type: [ChecklistItemSchema],
         default: [],

@@ -8,7 +8,7 @@ import {
   // acceptProxyInvite,
   requestEmergencyRelease,
   verifyEmergencyRelease,
-  updateConnectionProxyInfo,
+  // updateConnectionProxyInfo,
   getConnectionsForUser,
   connectionSearcher,
   acceptProxyDirectly,
@@ -44,7 +44,7 @@ connectionRoutes.get("/connections/proxy/invite/:token", validateProxyInvite);
 // connectionRoutes.post("/connections/accept-proxy-invite", auth, acceptProxyInvite);
 
 // Route for proxy user to update information on connections
-connectionRoutes.post("/connections/proxy/update", auth, updateConnectionProxyInfo)
+// connectionRoutes.post("/connections/proxy/update", auth, updateConnectionProxyInfo)
 
 
 connectionRoutes.post("/connections/:connectionId/request-release", requestEmergencyRelease);

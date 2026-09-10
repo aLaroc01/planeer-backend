@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.verifyEmergencyRelease = exports.requestEmergencyRelease = exports.updateConnectionProxyInfo = exports.validateProxyInvite = exports.createDirectProxyConnectionService = exports.acceptProxyDirectly = exports.denyProxyDirectly = exports.sendConnectionRequest = exports.createProxyConnection = exports.connectionSearcher = exports.getConnectionsForUser = void 0;
+exports.verifyEmergencyRelease = exports.requestEmergencyRelease = exports.validateProxyInvite = exports.createDirectProxyConnectionService = exports.acceptProxyDirectly = exports.denyProxyDirectly = exports.sendConnectionRequest = exports.createProxyConnection = exports.connectionSearcher = exports.getConnectionsForUser = void 0;
 const user_model_1 = require("../auth/user.model");
 const connection_model_1 = __importDefault(require("./connection.model"));
 const connection_service_1 = require("../connections/connection.service");
@@ -206,11 +206,10 @@ const validateProxyInvite = async (req, res) => {
 };
 exports.validateProxyInvite = validateProxyInvite;
 // Update connection info (based on connectionID)
-const updateConnectionProxyInfo = async (req, res) => {
-    const result = await (0, connection_service_1.updateConnectionProxyService)(req);
-    return res.status(result.status === "success" ? 200 : 400).json(result);
-};
-exports.updateConnectionProxyInfo = updateConnectionProxyInfo;
+// export const updateConnectionProxyInfo = async (req: Request, res: Response) => {
+//   const result = await updateConnectionProxyService(req);
+//       return res.status(result.status === "success" ? 200 : 400).json(result);
+// }
 // export const acceptProxyInvite = async (req: Request, res: Response) => {
 //   try {
 //     const { token, userId } = req.body;

@@ -3,10 +3,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteChecklist = exports.updateChecklist = exports.getChecklistByUser = exports.createChecklist = void 0;
+exports.deleteChecklist = exports.updateChecklist = exports.updateChecklistProxy = exports.getChecklistByCurrentUser = exports.createChecklist = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
 const checklist_service_1 = __importDefault(require("./checklist.service"));
-const connection_model_1 = __importDefault(require("../connections/connection.model"));
+const checklist_model_1 = __importDefault(require("./checklist.model"));
 const checklistService = new checklist_service_1.default();
 const getAuthenticatedUserId = (req) => {
     return req.user?.id;
@@ -52,30 +52,22 @@ const createChecklist = async (req, res) => {
     }
 };
 exports.createChecklist = createChecklist;
-const getChecklistByUser = async (req, res) => {
+const getChecklistByCurrentUser = async (req, res) => {
     try {
-        const requesterId = req.user?.id;
-        const checklistOwnerId = req.params.id;
-        if (!requesterId) {
+        const userId = req.user?.id;
+        if (!userId) {
             return res.status(401).json({
                 status: "failed",
                 message: "Unauthorized",
             });
         }
-        if (!mongoose_1.default.Types.ObjectId.isValid(requesterId)) {
+        if (!mongoose_1.default.Types.ObjectId.isValid(userId)) {
             return res.status(401).json({
                 status: "failed",
                 message: "Invalid authenticated user ID",
             });
         }
-        if (!mongoose_1.default.Types.ObjectId.isValid(checklistOwnerId)) {
-            return res.status(400).json({
-                status: "failed",
-                message: "Invalid checklist owner ID",
-            });
-        }
-        const isOwner = requesterId === checklistOwnerId;
-        const result = await checklistService.getChecklistByUserService(requesterId);
+        const result = await checklistService.getChecklistByUserService(userId);
         if (!result) {
             return res.status(404).json({
                 status: "failed",
@@ -83,19 +75,25 @@ const getChecklistByUser = async (req, res) => {
                 data: null,
             });
         }
-        if (!isOwner) {
-            // Non-owners must have an active connection
-            const activeConnection = await connection_model_1.default.exists({
-                grantorId: checklistOwnerId,
-                proxyUserId: requesterId,
-                status: "active",
+        const ownerId = String(result?.userId);
+        const primaryProxyId = result?.primaryProxyId ? String(result?.primaryProxyId) : null;
+        const secondaryProxyId = result?.secondaryProxyId ? String(result?.secondaryProxyId) : null;
+        const requesterIdStr = String(userId);
+        const isOwner = ownerId === requesterIdStr;
+        const isPrimaryProxy = primaryProxyId === requesterIdStr;
+        const isSecondaryProxy = secondaryProxyId === requesterIdStr;
+        if (!isOwner && !isPrimaryProxy && !isSecondaryProxy) {
+            return res.status(403).json({
+                status: "failed",
+                message: "You do not have permission to view this checklist",
             });
-            if (!activeConnection) {
-                return res.status(403).json({
-                    status: "failed",
-                    message: "You do not have permission to view this checklist",
-                });
-            }
+        }
+        // Optional sanity check
+        if (String(result.userId) !== String(userId)) {
+            return res.status(403).json({
+                status: "failed",
+                message: "You do not have permission to view this checklist",
+            });
         }
         return res.status(200).json({
             status: "success",
@@ -110,7 +108,47 @@ const getChecklistByUser = async (req, res) => {
         });
     }
 };
-exports.getChecklistByUser = getChecklistByUser;
+exports.getChecklistByCurrentUser = getChecklistByCurrentUser;
+const updateChecklistProxy = async (req, res) => {
+    try {
+        const ownerId = req.user?.id;
+        const { proxyId } = req.body;
+        if (!ownerId) {
+            return res.status(401).json({
+                status: "failed",
+                message: "Unauthorized",
+            });
+        }
+        if (proxyId !== undefined && proxyId !== null) {
+            if (!mongoose_1.default.Types.ObjectId.isValid(proxyId)) {
+                return res.status(400).json({
+                    status: "failed",
+                    message: "Invalid proxyId",
+                });
+            }
+        }
+        const checklist = await checklist_model_1.default.findOneAndUpdate({ userId: ownerId }, { proxyId: proxyId ?? null });
+        if (!checklist) {
+            return res.status(404).json({
+                status: "failed",
+                message: "Checklist not found",
+                data: null,
+            });
+        }
+        return res.status(200).json({
+            status: "success",
+            message: "Proxy updated",
+            data: checklist,
+        });
+    }
+    catch (error) {
+        return res.status(500).json({
+            status: "failed",
+            message: error.message || "Something went wrong",
+        });
+    }
+};
+exports.updateChecklistProxy = updateChecklistProxy;
 const updateChecklist = async (req, res) => {
     try {
         const userId = getAuthenticatedUserId(req);

@@ -11,6 +11,7 @@ async function main() {
     app_1.default.listen(config_1.config.port, () => {
         console.log(`Server is running on port ${config_1.config.port}`);
     });
+    console.log(">>> DEPLOY CHECK: backend build v2");
 }
 main().then(() => console.log("MongoDB connected successfully!")).catch((error) => {
     console.error("Error connecting to the database:", error);

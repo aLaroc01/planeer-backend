@@ -24,6 +24,12 @@ const connectionSchema = new mongoose_1.default.Schema({
         default: null,
         index: true,
     },
+    proxyRole: {
+        type: String,
+        enum: ["primary", "secondary"],
+        default: "primary",
+        index: true,
+    },
     inviteToken: {
         type: String,
         default: null,

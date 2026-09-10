@@ -8,8 +8,9 @@ const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
 const path_1 = __importDefault(require("path"));
 const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
+const dotenv_1 = __importDefault(require("dotenv"));
+// Routes
 const user_routes_1 = require("./app/modules/auth/user.routes");
-const errorHandler_1 = __importDefault(require("./app/middleware/errorHandler"));
 const financial_routes_1 = require("./app/modules/financial-Information/financial.routes");
 const medical_routes_1 = require("./app/modules/medical-Information/medical.routes");
 const social_routes_1 = require("./app/modules/social-Information/social.routes");
@@ -18,31 +19,50 @@ const homeauto_routes_1 = require("./app/modules/homeAuto-Information/homeauto.r
 const report_routes_1 = require("./app/modules/report-Information/report.routes");
 const package_routes_1 = require("./app/modules/package/package.routes");
 const subscriptions_routes_1 = require("./app/modules/subscriptions-information/subscriptions.routes");
-const subscriptionExpire_cron_1 = require("./app/modules/subscriptions-information/subscriptionExpire.cron");
-const requestLogger_1 = require("./helpers/requestLogger");
-const dotenv_1 = __importDefault(require("dotenv"));
 const profile_routes_1 = require("./app/modules/Profile-Information/profile.routes");
 const reviews_routes_1 = require("./app/modules/reviews/reviews.routes");
 const connection_routes_1 = __importDefault(require("./app/modules/connections/connection.routes"));
-// express-fileupload does not ship TypeScript declarations.
-// @ts-expect-error -- the package is used as middleware at runtime.
-const express_fileupload_1 = __importDefault(require("express-fileupload"));
 const auditLog_routes_1 = require("./app/modules/audit-log/auditLog.routes");
 const support_routes_1 = require("./app/modules/support/support.routes");
 const checklist_routes_1 = require("./app/modules/checklist/checklist.routes");
+// Controllers / middleware / helpers
 const subscriptions_controller_1 = require("./app/modules/subscriptions-information/subscriptions.controller");
+const subscriptionExpire_cron_1 = require("./app/modules/subscriptions-information/subscriptionExpire.cron");
+const errorHandler_1 = __importDefault(require("./app/middleware/errorHandler"));
+const requestLogger_1 = require("./helpers/requestLogger");
+// express-fileupload does not ship TypeScript declarations.
+// @ts-expect-error -- package is used as runtime Express middleware.
+const express_fileupload_1 = __importDefault(require("express-fileupload"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
+/*
+|--------------------------------------------------------------------------
+| Stripe webhook
+|--------------------------------------------------------------------------
+| Stripe requires the unparsed raw request body. This must remain before
+| express.json(), otherwise webhook signature verification can break.
+|--------------------------------------------------------------------------
+*/
 app.post("/api/v1/subscriptions/webhook", express_1.default.raw({ type: "application/json" }), subscriptions_controller_1.SubscriptionController.stripeWebhookHandler);
+/*
+|--------------------------------------------------------------------------
+| App settings
+|--------------------------------------------------------------------------
+*/
 app.set("view engine", "ejs");
 app.set("views", path_1.default.join(__dirname, "views"));
+/*
+|--------------------------------------------------------------------------
+| CORS — must run before normal middleware, auth, rate limiting, and routes
+|--------------------------------------------------------------------------
+*/
 const allowedOrigins = [
     "https://planeer-frontend.vercel.app",
     "http://localhost:5173",
 ];
-app.use((0, cors_1.default)({
+const corsOptions = {
     origin: (origin, callback) => {
-        // Allows Postman, curl, and server-to-server requests
+        // Allows curl, Postman, Render checks, and server-to-server calls.
         if (!origin) {
             return callback(null, true);
         }
@@ -52,44 +72,65 @@ app.use((0, cors_1.default)({
         return callback(new Error(`CORS blocked this origin: ${origin}`));
     },
     credentials: true,
-    methods: [
-        "GET",
-        "POST",
-        "PUT",
-        "PATCH",
-        "DELETE",
-        "OPTIONS",
-    ],
-    allowedHeaders: [
-        "Content-Type",
-        "Authorization",
-    ],
-}));
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    maxAge: 86400,
+    optionsSuccessStatus: 204,
+};
+app.use((0, cors_1.default)(corsOptions));
+// Explicitly finish all CORS preflights before they reach rate limits,
+// IP rules, file uploads, auth middleware, or API routes.
+app.options(/.*/, (0, cors_1.default)(corsOptions));
+/*
+|--------------------------------------------------------------------------
+| Body parsing and security
+|--------------------------------------------------------------------------
+*/
 app.use(express_1.default.json({ limit: "50mb" }));
-// app.use(cors());
 app.use((0, helmet_1.default)({
     crossOriginEmbedderPolicy: false,
 }));
-const limiter = (0, express_rate_limit_1.default)({ windowMs: 20 * 60 * 1000, max: 100, });
+/*
+|--------------------------------------------------------------------------
+| Rate limiting and request logging
+|--------------------------------------------------------------------------
+*/
+const limiter = (0, express_rate_limit_1.default)({
+    windowMs: 20 * 60 * 1000,
+    max: 100,
+});
 app.use(limiter);
 app.use(requestLogger_1.requestLogger);
+/*
+|--------------------------------------------------------------------------
+| File uploads
+|--------------------------------------------------------------------------
+*/
 app.use((0, express_fileupload_1.default)({
     createParentPath: true,
 }));
+/*
+|--------------------------------------------------------------------------
+| Optional IP allowlist
+|--------------------------------------------------------------------------
+*/
 const allowedIPs = (process.env.ALLOWED_TEST_IPS || "")
     .split(",")
     .map((ip) => ip.trim())
     .filter(Boolean);
 app.use((req, res, next) => {
-    // Get the real client IP. Behind Render, use x-forwarded-for.
+    // CORS preflight must never be blocked here.
+    if (req.method === "OPTIONS") {
+        return next();
+    }
+    // If no IP list is configured, allow all requests.
+    if (allowedIPs.length === 0) {
+        return next();
+    }
     const forwarded = req.headers["x-forwarded-for"];
     const ip = forwarded
         ? forwarded.toString().split(",")[0].trim()
         : req.socket.remoteAddress || "";
-    // If no list is configured, allow everything (safety fallback).
-    if (allowedIPs.length === 0) {
-        return next();
-    }
     if (allowedIPs.includes(ip)) {
         return next();
     }
@@ -98,29 +139,45 @@ app.use((req, res, next) => {
         message: "Your IP is not authorized to access this API.",
     });
 });
-// Serve uploaded files
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "")
-    .split(",")
-    .map((o) => o.trim())
-    .filter(Boolean);
+/*
+|--------------------------------------------------------------------------
+| Uploaded files
+|--------------------------------------------------------------------------
+*/
 app.use("/uploads", (req, res, next) => {
     const origin = req.headers.origin;
-    if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    if (origin && allowedOrigins.includes(origin)) {
         res.setHeader("Access-Control-Allow-Origin", origin);
+        res.setHeader("Vary", "Origin");
     }
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
-    next();
+    return next();
 });
 app.use("/uploads", express_1.default.static(path_1.default.join(process.cwd(), "uploads"), {
     setHeaders: (res) => {
         res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-        res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-        res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
     },
 }));
-//routes
+/*
+|--------------------------------------------------------------------------
+| Health check
+|--------------------------------------------------------------------------
+| Use this for a lightweight service-status check and potential keep-alive.
+|--------------------------------------------------------------------------
+*/
+app.get("/health", (_req, res) => {
+    return res.status(200).json({
+        status: "ok",
+        timestamp: new Date().toISOString(),
+    });
+});
+/*
+|--------------------------------------------------------------------------
+| API routes
+|--------------------------------------------------------------------------
+*/
 app.use("/api/v1", user_routes_1.userRoutes);
 app.use("/api/v1", financial_routes_1.financialRoutes);
 app.use("/api/v1", medical_routes_1.medicalRoutes);
@@ -136,15 +193,27 @@ app.use("/api/v1", social_routes_1.socialRoutes);
 app.use("/api/v1/audit-logs", auditLog_routes_1.AuditLogRoutes);
 app.use("/api/v1", support_routes_1.SupportRoutes);
 app.use("/api/v1", checklist_routes_1.ChecklistRoutes);
-app.use(express_1.default.json());
-//error handling middleware
-app.use(errorHandler_1.default);
-(0, subscriptionExpire_cron_1.startSubscriptionExpireCron)();
-app.get("/", (req, res) => {
-    res.send("Hello from Vercel!");
+/*
+|--------------------------------------------------------------------------
+| Basic routes
+|--------------------------------------------------------------------------
+*/
+app.get("/", (_req, res) => {
+    return res.send("Hello from Render!");
 });
-app.get("/test-error", (req, res) => {
+app.get("/test-error", (_req, _res) => {
     throw new Error("This is a test error");
 });
-exports.default = app; // trigger redeploy
-// trigger redeploy
+/*
+|--------------------------------------------------------------------------
+| Error handler — must be last
+|--------------------------------------------------------------------------
+*/
+app.use(errorHandler_1.default);
+/*
+|--------------------------------------------------------------------------
+| Background jobs
+|--------------------------------------------------------------------------
+*/
+(0, subscriptionExpire_cron_1.startSubscriptionExpireCron)();
+exports.default = app;
