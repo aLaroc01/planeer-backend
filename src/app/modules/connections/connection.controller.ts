@@ -5,7 +5,7 @@ import Connection from "./connection.model";
 import {
   createProxyConnectionService,
   acceptProxyInviteService,
-  updateConnectionProxyService,
+  // updateConnectionProxyService,
   updateConnectionPreauthorizedReleaseService,
   getConnectionsForUserService,
   canAddGrantorForProxy,
@@ -248,10 +248,10 @@ export const validateProxyInvite = async (req: Request, res: Response) => {
 
 
 // Update connection info (based on connectionID)
-export const updateConnectionProxyInfo = async (req: Request, res: Response) => {
-  const result = await updateConnectionProxyService(req);
-      return res.status(result.status === "success" ? 200 : 400).json(result);
-}
+// export const updateConnectionProxyInfo = async (req: Request, res: Response) => {
+//   const result = await updateConnectionProxyService(req);
+//       return res.status(result.status === "success" ? 200 : 400).json(result);
+// }
 
 
 // export const acceptProxyInvite = async (req: Request, res: Response) => {
