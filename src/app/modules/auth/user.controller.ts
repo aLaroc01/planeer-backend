@@ -29,12 +29,15 @@ export const registerUser = async (
         }
     
         const token = jwt.sign(
-            { userId: user._id, role: user.role },
+            { userId: user._id.toString(), 
+              role: user.role,
+              
+            },
             config.jwt_secret as string, { expiresIn: "1d" }
         );
 
-      logSuccess(req, "User registered successfully", { userId: user._id, email: user.email });
-    return res.status(201).json({success: true,message: "User registered successfully",statusCode: 201, data:{ _id: user._id ,phoneNumber: user.phoneNumber,email: user.email,role: user.role, token:token },meta: null});
+      logSuccess(req, "User registered successfully", { userId: user._id.toString(), email: user.email });
+    return res.status(201).json({success: true,message: "User registered successfully",statusCode: 201, data:{ _id: user._id.toString() ,phoneNumber: user.phoneNumber,email: user.email,role: user.role, token:token },meta: null});
   } catch (error) {
     next(error);
   }
@@ -57,10 +60,10 @@ export const loginUser = async (req:Request, res:Response, next:NextFunction) =>
 
       
           // 🔹 Success log
-    logSuccess(req, "User logged in successfully", { userId: user._id, email: user.email });
+    logSuccess(req, "User logged in successfully", { userId: user._id.toString(), email: user.email });
 
 
-      return res.status(200).json({ success: true, message: "User logged in successfully",statusCode: 200, data: {_id: user._id,phoneNumber: user.phoneNumber, email: user.email, role: user.role, token: token },
+      return res.status(200).json({ success: true, message: "User logged in successfully",statusCode: 200, data: {_id: user._id.toString(),phoneNumber: user.phoneNumber, email: user.email, role: user.role, token: token },
        meta: null
       });
 
