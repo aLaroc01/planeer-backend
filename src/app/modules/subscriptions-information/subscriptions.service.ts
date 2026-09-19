@@ -49,18 +49,31 @@ const asCustomerId = (
   return typeof customer === "string" ? customer : customer.id;
 };
 
-const getSubscriptionUserId = (subscription: Stripe.Subscription) => {
-  const userId = subscription.metadata?.userId;
+const getSubscriptionUserId = (
+    subscription: Stripe.Subscription,
+    sessionUserId?: string | null,
+  ) => {
+    const userId =
+      sessionUserId ??
+      subscription.metadata?.userId ??
+      subscription.metadata?.user_id ??
+      null;
 
-  if (!userId || !Types.ObjectId.isValid(userId)) {
-    throw new AppError(
-      StatusCodes.BAD_REQUEST,
-      "Stripe subscription is missing a valid user ID.",
-    );
-  }
+    console.log("Resolving subscription user ID:", {
+      sessionUserId,
+      subscriptionMetadata: subscription.metadata,
+      resolvedUserId: userId,
+    });
 
-  return userId;
-};
+    if (!userId || !Types.ObjectId.isValid(userId)) {
+      throw new AppError(
+        StatusCodes.BAD_REQUEST,
+        "Stripe subscription is missing a valid user ID.",
+      );
+    }
+
+    return userId;
+  };
 
 const getPackageId = (subscription: Stripe.Subscription) => {
   const packageId = subscription.metadata?.packageId;
@@ -99,8 +112,9 @@ const getCurrency = (subscription: Stripe.Subscription) => {
 };
 export const syncSubscriptionFromStripe = async (
   stripeSubscription: Stripe.Subscription,
+  sessionUserId?: string | null,
 ) => {
-  const userId = getSubscriptionUserId(stripeSubscription);
+  const userId = getSubscriptionUserId(stripeSubscription, sessionUserId);
   const packageId = getPackageId(stripeSubscription);
   const stripeCustomerId = asCustomerId(stripeSubscription.customer);
 
@@ -307,7 +321,10 @@ export const saveSubscriptionToDB = async (sessionId: string) => {
       ? await stripe.subscriptions.retrieve(session.subscription)
       : session.subscription;
 
-  return syncSubscriptionFromStripe(stripeSubscription);
+  return syncSubscriptionFromStripe(
+    stripeSubscription,
+    session.client_reference_id,
+  );
 };
 
 export const saveSubscriptionToDBFromPaymentLink = async (
@@ -329,7 +346,10 @@ export const saveSubscriptionToDBFromPaymentLink = async (
       ? await stripe.subscriptions.retrieve(session.subscription)
       : session.subscription;
 
-  return syncSubscriptionFromStripe(stripeSubscription);
+  return syncSubscriptionFromStripe(
+    stripeSubscription,
+    session.client_reference_id,
+  );
 };
 
 export const handleSubscriptionDeleted = async (
