@@ -223,7 +223,7 @@ app.use("/api/v1", personalRoutes);
 app.use("/api/v1", homeautoRoutes);
 app.use("/api/v1", ReportRoutes);
 app.use("/api/v1", PackageRoutes);
-app.use("/api/v1", SubscriptionRoutes);
+app.use("/api/v1/subscriptions", SubscriptionRoutes);
 app.use("/api/v1", ReviewRoutes);
 app.use("/api/v1", connectionRoutes);
 app.use("/api/v1", socialRoutes);

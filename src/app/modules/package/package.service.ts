@@ -11,10 +11,6 @@ import { updateSubscriptionInfo } from '../../../handlers/updateSubscriptionProd
 
 
 
-
-
-
-
 const createPackageToDB = async (payload: IPackage): Promise<IPackage | null> => {
      const productPayload = {
           title: payload.title,
