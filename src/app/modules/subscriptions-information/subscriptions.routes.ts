@@ -24,7 +24,7 @@ router.get('/premium-content', auth, subscriptionGuard, (req, res) => {
     res.send('This is premium content for active subscribers only.');
 });
 
-router.post( '/stripe/webhook',express.raw({ type: 'application/json' }), stripeWebhookHandler);
+router.post( '/stripe/webhook', stripeWebhookHandler);
 
 
 
