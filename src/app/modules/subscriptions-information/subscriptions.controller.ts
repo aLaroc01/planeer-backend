@@ -134,23 +134,14 @@ export const checkoutSuccessController = catchAsync(async (req, res ) => {
         throw new AppError(StatusCodes.BAD_REQUEST, 'Session ID is required');
     }
 
-//     if (!userId) {
-//         throw new AppError(StatusCodes.UNAUTHORIZED, 'User not found');
-//     }
-
     // Save subscription in DB   userId
     const subscription = await saveSubscriptionToDB(sessionId);
   
-    // Send response
-//     sendResponse(res, {
-//         statusCode: StatusCodes.OK,
-//         success: true,
-//         message: 'Subscription created successfully',
-//         data: subscription,
-//     });
-// 
-
-     res.render('subscription-success', { subscription });
+     res.status(StatusCodes.OK).json({
+      success: true,
+      message: "Subscription verified successfully.",
+      data: subscription,
+    });
 
 
 });
