@@ -92,14 +92,15 @@ const getPackageId = async (
     if (!stripePriceId) {
       throw new AppError(
         StatusCodes.BAD_REQUEST,
-        "Stripe subscription is missing a price ID.",
+        "Stripe subscription is missing a Stripe Price ID.",
       );
     }
 
     const packageDoc = await Package.findOne({
       priceId: stripePriceId,
       status: "active",
-    }).select("_id priceId");
+      isDeleted: false,
+    }).select("_id title priceId");
 
     if (!packageDoc) {
       throw new AppError(
@@ -108,10 +109,10 @@ const getPackageId = async (
       );
     }
 
-    console.log("Resolved subscription package:", {
-      metadataPackageId,
+    console.log("Resolved Planeer package from Stripe Price:", {
       stripePriceId,
       packageId: String(packageDoc._id),
+      packageTitle: packageDoc.title,
     });
 
     return String(packageDoc._id);
@@ -139,6 +140,32 @@ const getCurrency = (subscription: Stripe.Subscription) => {
   const item = subscription.items.data[0];
   return item?.price?.currency?.toLowerCase() ?? "usd";
 };
+
+
+const mapStripeSubscriptionStatus = (
+  stripeStatus: Stripe.Subscription.Status,
+) => {
+  switch (stripeStatus) {
+    case "active":
+    case "trialing":
+      return "active";
+
+    case "canceled":
+      return "cancel";
+
+    case "past_due":
+    case "unpaid":
+    case "incomplete":
+    case "incomplete_expired":
+    case "paused":
+      return "deactivated";
+
+    default:
+      return "expired";
+  }
+};
+
+
 export const syncSubscriptionFromStripe = async (
   stripeSubscription: Stripe.Subscription,
   sessionUserId?: string | null,
@@ -154,27 +181,38 @@ export const syncSubscriptionFromStripe = async (
     );
   }
 
-  const status = stripeSubscription.status as StripeSubscriptionStatus;
+  const currentPeriodStart = toDate(
+    stripeSubscription.items.data[0]?.current_period_start,
+  );
+
+  const currentPeriodEnd = toDate(
+    stripeSubscription.items.data[0]?.current_period_end,
+  );
+
+  if (!currentPeriodStart || !currentPeriodEnd) {
+    throw new AppError(
+      StatusCodes.BAD_REQUEST,
+      "Stripe subscription is missing its current billing period.",
+    );
+  }
+
+  const remaining = Math.max(
+    0,
+    Math.ceil(
+      (currentPeriodEnd.getTime() - Date.now()) /
+        (1000 * 60 * 60 * 24),
+    ),
+  );
 
   const subscriptionData = {
-    stripeCustomerId,
-    stripePriceId: getStripePriceId(stripeSubscription),
-    priceAmount: getPriceAmount(stripeSubscription),
-    currency: getCurrency(stripeSubscription),
+    customerId: stripeCustomerId,
+    price: getPriceAmount(stripeSubscription),
     userId: new Types.ObjectId(userId),
     package: new Types.ObjectId(packageId),
-    status,
-    trialStart: toDate(stripeSubscription.trial_start),
-    trialEnd: toDate(stripeSubscription.trial_end),
-    currentPeriodStart: toDate(
-      stripeSubscription.items.data[0]?.current_period_start,
-    ),
-    currentPeriodEnd: toDate(
-      stripeSubscription.items.data[0]?.current_period_end,
-    ),
-    cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
-    canceledAt: toDate(stripeSubscription.canceled_at),
-    endedAt: toDate(stripeSubscription.ended_at),
+    currentPeriodStart,
+    currentPeriodEnd,
+    remaining,
+    status: mapStripeSubscriptionStatus(stripeSubscription.status),
   };
 
   const dbSubscription = await Subscription.findOneAndUpdate(
@@ -204,7 +242,7 @@ const userUpdate: Record<string, unknown> = {
 
   // A user consumes the free trial once Stripe creates a trialing subscription.
   // This is intentionally never reset if they later cancel.
-  if (status === "trialing") {
+  if (stripeSubscription.status === "trialing") {
     userUpdate.hasUsedFreeTrial = true;
     userUpdate.freeTrialUsedAt = new Date();
   }
