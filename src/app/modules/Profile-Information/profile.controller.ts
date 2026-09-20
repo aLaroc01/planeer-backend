@@ -19,7 +19,7 @@ export const UpdateProfile = async (req: Request, res: Response) => {
 export const GetProfileData = async (req: Request, res: Response) => {
   try {  
         const result = await ProfileGetService(req);
-        console.log("here's medical info calls", result);
+        console.log("here's profile info:", result);
 
         return res.status(result.status === "success" ? 200 : 400).json(result);
     } catch (error: any) {

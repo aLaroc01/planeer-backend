@@ -75,18 +75,47 @@ const getSubscriptionUserId = (
     return userId;
   };
 
-const getPackageId = (subscription: Stripe.Subscription) => {
-  const packageId = subscription.metadata?.packageId;
+const getPackageId = async (
+    subscription: Stripe.Subscription,
+  ) => {
+    const metadataPackageId =
+      subscription.metadata?.packageId ??
+      subscription.metadata?.package_id ??
+      null;
 
-  if (!packageId || !Types.ObjectId.isValid(packageId)) {
-    throw new AppError(
-      StatusCodes.BAD_REQUEST,
-      "Stripe subscription is missing a valid package ID.",
-    );
-  }
+    if (metadataPackageId && Types.ObjectId.isValid(metadataPackageId)) {
+      return metadataPackageId;
+    }
 
-  return packageId;
-};
+    const stripePriceId = subscription.items.data[0]?.price?.id;
+
+    if (!stripePriceId) {
+      throw new AppError(
+        StatusCodes.BAD_REQUEST,
+        "Stripe subscription is missing a price ID.",
+      );
+    }
+
+    const packageDoc = await Package.findOne({
+      priceId: stripePriceId,
+      status: "active",
+    }).select("_id priceId");
+
+    if (!packageDoc) {
+      throw new AppError(
+        StatusCodes.BAD_REQUEST,
+        `No active Planeer package matches Stripe Price ID: ${stripePriceId}`,
+      );
+    }
+
+    console.log("Resolved subscription package:", {
+      metadataPackageId,
+      stripePriceId,
+      packageId: String(packageDoc._id),
+    });
+
+    return String(packageDoc._id);
+  };
 
 const getStripePriceId = (subscription: Stripe.Subscription) => {
   const item = subscription.items.data[0];
@@ -115,7 +144,7 @@ export const syncSubscriptionFromStripe = async (
   sessionUserId?: string | null,
 ) => {
   const userId = getSubscriptionUserId(stripeSubscription, sessionUserId);
-  const packageId = getPackageId(stripeSubscription);
+  const packageId = await getPackageId(stripeSubscription);
   const stripeCustomerId = asCustomerId(stripeSubscription.customer);
 
   if (!stripeCustomerId) {
