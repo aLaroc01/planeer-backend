@@ -9,6 +9,8 @@ export interface ISuggestionProgress {
   dismissedAt?: Date | null;
 }
 
+export type ProfileMainRole = "GRANTOR" | "PROXY";
+
 export interface PROFILE extends Document {
   firstName: string;
   lastName: string;
@@ -18,8 +20,7 @@ export interface PROFILE extends Document {
   state: string;
   zipcode: string;
   phoneNumber: string;
-  mainRole: string;
-  imgUrl: string;
+  mainRole: ProfileMainRole;
 
   profilePercentage: number;
 

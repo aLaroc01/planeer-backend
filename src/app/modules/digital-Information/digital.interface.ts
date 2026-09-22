@@ -3,10 +3,10 @@ import { IUser } from "../auth/user.interface";
 
 
 
-export interface ISocialInfo extends Document {
+export interface IDigitalInfo extends Document {
   userID: IUser | Types.ObjectId;
-  socialMedia?: string;       
+  digitalMedia?: string;       
   website?: string;   
-  socialInfoPercentage:number; 
+  digitalInfoPercentage:number; 
   streamingService?: string;  
 }

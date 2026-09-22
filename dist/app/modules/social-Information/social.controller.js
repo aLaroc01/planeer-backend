@@ -1,14 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.GetSocialData = exports.SocialInformation = void 0;
-const social_service_1 = require("./social.service");
-const SocialInformation = async (req, res) => {
-    let result = await (0, social_service_1.SocialInformationService)(req);
+exports.GetDigitalData = exports.DigitalInformation = void 0;
+const digital_service_1 = require("./digital.service");
+const DigitalInformation = async (req, res) => {
+    let result = await (0, digital_service_1.DigitalInformationService)(req);
     res.json(result);
 };
-exports.SocialInformation = SocialInformation;
-const GetSocialData = async (req, res) => {
-    const result = await (0, social_service_1.SocialGetService)(req);
+exports.DigitalInformation = DigitalInformation;
+const GetDigitalData = async (req, res) => {
+    const result = await (0, digital_service_1.DigitalGetService)(req);
     return res.status(200).json(result);
 };
-exports.GetSocialData = GetSocialData;
+exports.GetDigitalData = GetDigitalData;

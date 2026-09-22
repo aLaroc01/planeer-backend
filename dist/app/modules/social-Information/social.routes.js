@@ -3,13 +3,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.socialRoutes = void 0;
+exports.digitalRoutes = void 0;
 const express_1 = __importDefault(require("express"));
 const auth_middleware_1 = require("./../../middleware/auth.middleware");
-const social_controller_1 = require("./social.controller");
+const digital_controller_1 = require("./digital.controller");
 const router = express_1.default.Router();
 // create Financial Information 
-router.post("/CreateSocialInfo", auth_middleware_1.auth, social_controller_1.SocialInformation);
-router.post("/UpdateSocialInfo", auth_middleware_1.auth, social_controller_1.SocialInformation);
-router.get("/GetSocialData", auth_middleware_1.auth, social_controller_1.GetSocialData);
-exports.socialRoutes = router;
+router.post("/CreateDigitalInfo", auth_middleware_1.auth, digital_controller_1.DigitalInformation);
+router.post("/UpdateDigitalInfo", auth_middleware_1.auth, digital_controller_1.DigitalInformation);
+router.get("/GetDigitalData", auth_middleware_1.auth, digital_controller_1.GetDigitalData);
+exports.digitalRoutes = router;

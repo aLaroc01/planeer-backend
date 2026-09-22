@@ -53,7 +53,7 @@ const permissionsSchema = new mongoose_1.Schema({
     medical: { type: Boolean, default: false },
     financial: { type: Boolean, default: false },
     homeAuto: { type: Boolean, default: false },
-    social: { type: Boolean, default: false },
+    digital: { type: Boolean, default: false },
 }, { _id: false });
 const proxyRelationshipSchema = new mongoose_1.Schema({
     relationshipLabel: { type: String, trim: true, default: "" },

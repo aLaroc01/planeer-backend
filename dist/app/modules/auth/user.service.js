@@ -50,7 +50,7 @@ const medical_model_1 = require("../../modules/medical-Information/medical.model
 const homeauto_model_1 = require("../homeAuto-Information/homeauto.model");
 const personal_model_1 = require("../../modules/personal-Information/personal.model");
 const profile_model_1 = require("../Profile-Information/profile.model");
-const social_model_1 = require("../../modules/social-Information/social.model");
+const digital_model_1 = require("../../modules/digital-Information/digital.model");
 const user_interface_1 = require("./user.interface");
 const auditLog_model_1 = require("../audit-log/auditLog.model");
 const auditLog_interface_1 = require("../audit-log/auditLog.interface");
@@ -316,11 +316,11 @@ const createEmptyProfileForSignedInUser = async (req) => {
         if (!user) {
             return { status: "failed", message: "User not found" };
         }
-        const [medicalExists, financialExists, homeAutoExists, socialExists, personalExists, profileExists] = await Promise.all([
+        const [medicalExists, financialExists, homeAutoExists, digitalExists, personalExists, profileExists] = await Promise.all([
             medical_model_1.MedicalInfoModel.exists({ userID: userId }),
             financial_model_1.FinancialModel.exists({ userID: userId }),
             homeauto_model_1.HomeAutoModel.exists({ userID: userId }),
-            social_model_1.SocialInfoModel.exists({ userID: userId }),
+            digital_model_1.DigitalInfoModel.exists({ userID: userId }),
             personal_model_1.PersonalModel.exists({ userID: userId }),
             profile_model_1.ProfileModel.exists({ userID: userId }),
         ]);
@@ -331,8 +331,8 @@ const createEmptyProfileForSignedInUser = async (req) => {
             createTasks.push(financial_model_1.FinancialModel.create({ userID: userId }));
         if (!homeAutoExists)
             createTasks.push(homeauto_model_1.HomeAutoModel.create({ userID: userId }));
-        if (!socialExists)
-            createTasks.push(social_model_1.SocialInfoModel.create({ userID: userId }));
+        if (!digitalExists)
+            createTasks.push(digital_model_1.DigitalInfoModel.create({ userID: userId }));
         if (!personalExists)
             createTasks.push(personal_model_1.PersonalModel.create({ userID: userId }));
         if (!profileExists)
@@ -496,10 +496,10 @@ const getUserFullProfileService = async (userId) => {
         },
         {
             $lookup: {
-                from: "socialinfos",
+                from: "digitalinfos",
                 localField: "_id",
                 foreignField: "userID",
-                as: "socialInfo",
+                as: "digitalInfo",
             },
         },
         {
@@ -532,7 +532,7 @@ const getUserFullProfileService = async (userId) => {
                 name: 1,
                 email: 1,
                 // financialPercentage: { $arrayElemAt: ["$financialInfo.financialPercentage", 0] },
-                // socialInfo: { $arrayElemAt: ["$socialInfo.socialInfoPercentage", 0] },
+                // digitalInfo: { $arrayElemAt: ["$digitalInfo.digitalInfoPercentage", 0] },
                 // homeAutoInfo: { $arrayElemAt: ["$homeAutoInfo.homeautoPercentage", 0] },
                 // medicalsInfo: { $arrayElemAt: ["$medicalsInfo.medicalsPercentage", 0] },
             },
@@ -546,11 +546,11 @@ const getAllOwnUserDataService = async (loggedInUserId) => {
     const user = await user_model_1.User.findById(loggedInUserId);
     if (!user)
         throw new Error("USER_NOT_FOUND");
-    const [homeauto, medical, financial, socialInfo, personalInfo] = await Promise.all([
+    const [homeauto, medical, financial, digitalInfo, personalInfo] = await Promise.all([
         homeauto_model_1.HomeAutoModel.find({ userID: loggedInUserId }),
         medical_model_1.MedicalInfoModel.find({ userID: loggedInUserId }),
         financial_model_1.FinancialModel.find({ userID: loggedInUserId }),
-        social_model_1.SocialInfoModel.find({ userID: loggedInUserId }),
+        digital_model_1.DigitalInfoModel.find({ userID: loggedInUserId }),
         personal_model_1.PersonalModel.find({ userID: loggedInUserId }),
         // User.find({ userID: loggedInUserId }),
     ]);
@@ -569,8 +569,8 @@ exports.getAllOwnUserDataService = getAllOwnUserDataService;
 //   (sum, item) => sum + (item.financialPercentage || 0),
 //   0
 // );
-// const socialInfoPercentage = socialInfo.reduce(
-//   (sum, item) => sum + (item.socialInfoPercentage || 0),
+// const digitalInfoPercentage = digitalInfo.reduce(
+//   (sum, item) => sum + (item.digitalInfoPercentage || 0),
 //   0
 // );
 // userPercentage runtime only
@@ -579,7 +579,7 @@ exports.getAllOwnUserDataService = getAllOwnUserDataService;
 //   homeautoPercentage +
 //   medicalPercentage +
 //   financialPercentage +
-//   socialInfoPercentage; 
+//   digitalInfoPercentage; 
 // + userPercentage;
 // 💡 Suggestion logic (3 suggestions for every case)
 // let suggestions: string[] = [];
@@ -608,11 +608,11 @@ exports.getAllOwnUserDataService = getAllOwnUserDataService;
 //     "Completing your profile unlocks more features"
 //   ];
 // }
-// return { user,homeauto, medical, financial,socialInfo , percentages: {
+// return { user,homeauto, medical, financial,digitalInfo , percentages: {
 //   homeautoPercentage,
 //   medicalPercentage,
 //   financialPercentage,
-//   socialInfoPercentage,
+//   digitalInfoPercentage,
 //   // userPercentage,
 //   totalPercentage
 // }, suggestions };
@@ -625,11 +625,11 @@ const getAllUserDataService = async (requestedUserId, loggedInUserId) => {
     const isProxyUser = user.proxysetId.some((id) => id.toString() === loggedInUserId.toString());
     if (!isOwnData && !isProxyUser)
         throw new Error("ACCESS_DENIED");
-    const [homeauto, medical, financial, socialInfo, personalInfo] = await Promise.all([
+    const [homeauto, medical, financial, digitalInfo, personalInfo] = await Promise.all([
         homeauto_model_1.HomeAutoModel.find({ userID: user._id }),
         medical_model_1.MedicalInfoModel.find({ userID: user._id }),
         financial_model_1.FinancialModel.find({ userID: user._id }),
-        social_model_1.SocialInfoModel.find({ userID: user._id }),
+        digital_model_1.DigitalInfoModel.find({ userID: user._id }),
         personal_model_1.PersonalModel.find({ userID: user._id })
     ]);
     return {
@@ -637,7 +637,7 @@ const getAllUserDataService = async (requestedUserId, loggedInUserId) => {
         homeauto,
         medical,
         financial,
-        socialInfo,
+        digitalInfo,
         personalInfo,
     };
 };

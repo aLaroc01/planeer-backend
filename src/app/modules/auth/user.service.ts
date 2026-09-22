@@ -13,7 +13,7 @@ import { MedicalInfoModel } from "../../modules/medical-Information/medical.mode
 import { HomeAutoModel } from "../homeAuto-Information/homeauto.model";
 import { PersonalModel } from "../../modules/personal-Information/personal.model";
 import { ProfileModel } from "../Profile-Information/profile.model";
-import { SocialInfoModel } from "../../modules/social-Information/social.model";
+import { DigitalInfoModel } from "../../modules/digital-Information/digital.model";
 import { ProxyUser, ProxyUserResponse, AccountStatus, Role } from "./user.interface";
 import { AuditLog } from "../audit-log/auditLog.model";
 import { AuditAction } from "../audit-log/auditLog.interface";
@@ -82,15 +82,6 @@ export const existingUser = async (body: any) => {
     "phoneNumber",
     "imgUrl"
   ];
-
-  const filledFields = FIELDS.filter(field => {
-    const value = body[field];
-    if (!value) return false;
-    if (typeof value === "string" && value.trim() === "") return false;
-    return true;
-  }).length;
-
-  // const userPercentage = Math.round((filledFields / FIELDS.length) * 100);
 
   // Create new user with calculated percentage
   const newUser = new User({
@@ -161,8 +152,6 @@ export const getprofileService =async (req:Request) => {
     return {status:'failed', data: error};
   }
 }
-
-
 
 
 
@@ -376,12 +365,12 @@ export const createEmptyProfileForSignedInUser = async (req: Request) => {
       return { status: "failed", message: "User not found" };
     }
 
-    const [medicalExists, financialExists, homeAutoExists, socialExists, personalExists, profileExists] =
+    const [medicalExists, financialExists, homeAutoExists, digitalExists, personalExists, profileExists] =
       await Promise.all([
         MedicalInfoModel.exists({ userID: userId }),
         FinancialModel.exists({ userID: userId }),
         HomeAutoModel.exists({ userID: userId }),
-        SocialInfoModel.exists({ userID: userId }),
+        DigitalInfoModel.exists({ userID: userId }),
         PersonalModel.exists({ userID: userId }),
         ProfileModel.exists({ userID: userId }),
       ]);
@@ -391,7 +380,7 @@ export const createEmptyProfileForSignedInUser = async (req: Request) => {
     if (!medicalExists) createTasks.push(MedicalInfoModel.create({ userID: userId }));
     if (!financialExists) createTasks.push(FinancialModel.create({ userID: userId }));
     if (!homeAutoExists) createTasks.push(HomeAutoModel.create({ userID: userId }));
-    if (!socialExists) createTasks.push(SocialInfoModel.create({ userID: userId }));
+    if (!digitalExists) createTasks.push(DigitalInfoModel.create({ userID: userId }));
     if (!personalExists) createTasks.push(PersonalModel.create({ userID: userId }));
     if (!profileExists) createTasks.push(ProfileModel.create({ userID: userId }));
 
@@ -610,10 +599,10 @@ export const getUserFullProfileService = async (userId: string) => {
     },
     {
       $lookup: {
-        from: "socialinfos",
+        from: "digitalinfos",
         localField: "_id",
         foreignField: "userID",
-        as: "socialInfo",
+        as: "digitalInfo",
       },
     },
     {
@@ -652,7 +641,7 @@ export const getUserFullProfileService = async (userId: string) => {
         name: 1,
         email: 1,
         // financialPercentage: { $arrayElemAt: ["$financialInfo.financialPercentage", 0] },
-        // socialInfo: { $arrayElemAt: ["$socialInfo.socialInfoPercentage", 0] },
+        // digitalInfo: { $arrayElemAt: ["$digitalInfo.digitalInfoPercentage", 0] },
         // homeAutoInfo: { $arrayElemAt: ["$homeAutoInfo.homeautoPercentage", 0] },
         // medicalsInfo: { $arrayElemAt: ["$medicalsInfo.medicalsPercentage", 0] },
       },
@@ -675,11 +664,11 @@ export const getAllOwnUserDataService = async (loggedInUserId: string) => {
   if (!user) throw new Error("USER_NOT_FOUND");
 
 
-  const [homeauto, medical, financial,socialInfo, personalInfo] = await Promise.all([
+  const [homeauto, medical, financial,digitalInfo, personalInfo] = await Promise.all([
     HomeAutoModel.find({ userID: loggedInUserId }),
     MedicalInfoModel.find({ userID: loggedInUserId }),
     FinancialModel.find({ userID: loggedInUserId }),
-    SocialInfoModel.find({ userID: loggedInUserId }),
+    DigitalInfoModel.find({ userID: loggedInUserId }),
     PersonalModel.find({ userID: loggedInUserId }), 
     // User.find({ userID: loggedInUserId }),
   
@@ -703,8 +692,8 @@ export const getAllOwnUserDataService = async (loggedInUserId: string) => {
   //   0
   // );
 
-  // const socialInfoPercentage = socialInfo.reduce(
-  //   (sum, item) => sum + (item.socialInfoPercentage || 0),
+  // const digitalInfoPercentage = digitalInfo.reduce(
+  //   (sum, item) => sum + (item.digitalInfoPercentage || 0),
   //   0
   // );
 
@@ -719,7 +708,7 @@ export const getAllOwnUserDataService = async (loggedInUserId: string) => {
   //   homeautoPercentage +
   //   medicalPercentage +
   //   financialPercentage +
-  //   socialInfoPercentage; 
+  //   digitalInfoPercentage; 
     // + userPercentage;
 
  
@@ -755,11 +744,11 @@ export const getAllOwnUserDataService = async (loggedInUserId: string) => {
 
 
 
-  // return { user,homeauto, medical, financial,socialInfo , percentages: {
+  // return { user,homeauto, medical, financial,digitalInfo , percentages: {
     //   homeautoPercentage,
     //   medicalPercentage,
     //   financialPercentage,
-    //   socialInfoPercentage,
+    //   digitalInfoPercentage,
     //   // userPercentage,
     //   totalPercentage
     // }, suggestions };
@@ -786,11 +775,11 @@ export const getAllUserDataService = async (
 
   if (!isOwnData && !isProxyUser) throw new Error("ACCESS_DENIED");
 
-  const [homeauto, medical, financial, socialInfo, personalInfo] = await Promise.all([
+  const [homeauto, medical, financial, digitalInfo, personalInfo] = await Promise.all([
     HomeAutoModel.find({ userID: user._id }),
     MedicalInfoModel.find({ userID: user._id }),
     FinancialModel.find({ userID: user._id }),
-    SocialInfoModel.find({ userID: user._id }),
+    DigitalInfoModel.find({ userID: user._id }),
     PersonalModel.find({ userID: user._id })
   ]);
 
@@ -799,7 +788,7 @@ export const getAllUserDataService = async (
     homeauto,
     medical,
     financial,
-    socialInfo,
+    digitalInfo,
     personalInfo,
   };
 };

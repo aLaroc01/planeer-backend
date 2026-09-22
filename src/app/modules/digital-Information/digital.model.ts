@@ -1,7 +1,7 @@
 import { model, Schema } from "mongoose";
-import { ISocialInfo } from "./social.interface";
+import { IDigitalInfo } from "./digital.interface";
 
-const SocialInfoSchema = new Schema<ISocialInfo>(
+const DigitalInfoSchema = new Schema<IDigitalInfo>(
   {
     userID: {
       type: Schema.Types.ObjectId,
@@ -9,7 +9,7 @@ const SocialInfoSchema = new Schema<ISocialInfo>(
       required: true,
       index: true,
     },
-    socialMedia: {
+    digitalMedia: {
       type: String,
       trim: true,
       default: undefined,
@@ -24,9 +24,9 @@ const SocialInfoSchema = new Schema<ISocialInfo>(
       trim: true,
       default: undefined,
     },
-    socialInfoPercentage: { type: Number },
+    digitalInfoPercentage: { type: Number },
   },
   { timestamps: true, versionKey: false }
 );
 
-export const SocialInfoModel = model<ISocialInfo>("socialInfo", SocialInfoSchema);
+export const DigitalInfoModel = model<IDigitalInfo>("digitalInfo", DigitalInfoSchema);

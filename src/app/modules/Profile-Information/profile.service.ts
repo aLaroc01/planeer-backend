@@ -1,45 +1,69 @@
 import app from "../../../app";
 import { User } from "../auth/user.model";
 import { ProfileModel } from './profile.model';
+import { ProfileMainRole } from './profile.interface'; 
 import express, { Request } from "express";
 import path from "path";
 import fs from "fs";
 
-
 export const ProfileCreateService = async (req: Request) => {
-  const user_id = req.user?.id; 
-  const requestBody = req.body;  
-  const mainRole = "PROXY"; 
-try {
-    
-    console.log("ProfileCreateService called with requestBody:", requestBody.data, user_id);
+  const userId = req.user?.id;
+  const { data, onboardingType } = req.body;
 
-    const activeProxy = await ProfileModel.findOne({
-          userID: user_id, // check if profile already exists for this user
-        });
+  try {
+    if (!userId) {
+      return {
+        status: "failed",
+        message: "Unauthorized: user ID is missing.",
+      };
+    }
 
-        if (!activeProxy) {
-          const profileCreate = await ProfileModel.create({
-            ...requestBody.data,
-            userID: user_id,
-            mainRole: mainRole,
-          });
-          return {
-            status: "success",
-            message: `Profile created successfully`,
-            data: profileCreate,
-          };
-        } else {
-          return {
-            status: "failed",
-            message: "Profile already exists for this user",
-          };
-        }
+    if (!data || typeof data !== "object") {
+      return {
+        status: "failed",
+        message: "Profile data is required.",
+      };
+    }
+
+    const existingProfile = await ProfileModel.findOne({
+      userID: userId,
+    });
+
+    if (existingProfile) {
+      return {
+        status: "failed",
+        message: "A profile already exists for this user.",
+      };
+    }
+
+    const normalizedOnboardingType =
+      typeof onboardingType === "string"
+        ? onboardingType.trim().toLowerCase()
+        : "grantor";
+
+    const mainRole: ProfileMainRole =
+      normalizedOnboardingType === "proxy"
+        ? "PROXY"
+        : "GRANTOR";
+
+    const profileCreate = await ProfileModel.create({
+      ...data,
+      userID: userId,
+      mainRole,
+    });
+
+    return {
+      status: "success",
+      message: "Profile created successfully.",
+      data: profileCreate,
+    };
   } catch (error: any) {
-    return { status: "failed", message: error.message || "Failed to create profile data" };
+    return {
+      status: "failed",
+      message: error?.message || "Failed to create profile data.",
+    };
   }
 };
-
 
 
 export const ProfileUpdateService = async (req: Request) => {

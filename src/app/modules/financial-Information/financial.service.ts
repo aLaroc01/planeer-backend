@@ -2,7 +2,7 @@
 import { User } from "../auth/user.model";
 import { HomeAutoModel } from "../homeAuto-Information/homeauto.model";
 import { MedicalInfoModel } from "../medical-Information/medical.model";
-import { SocialInfoModel } from "../social-Information/social.model";
+import { DigitalInfoModel } from "../digital-Information/digital.model";
 import { FinancialModel } from "./financial.model";
 import { Request } from "express";
 

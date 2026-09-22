@@ -57,7 +57,7 @@ export const createProxyRelationship = async (req: Request, res: Response) => {
         medical: payload.permissions?.medical ?? false,
         financial: payload.permissions?.financial ?? false,
         homeAuto: payload.permissions?.homeAuto ?? false,
-        social: payload.permissions?.social ?? false,
+        digital: payload.permissions?.digital ?? false,
       },
       notes: payload.notes ?? "",
       lastActivityAt: payload.lastActivityAt ?? null,
@@ -125,7 +125,7 @@ export const updateProxyRelationship = async (req: Request, res: Response) => {
         medical: payload.permissions.medical ?? relationship.permissions.medical,
         financial: payload.permissions.financial ?? relationship.permissions.financial,
         homeAuto: payload.permissions.homeAuto ?? relationship.permissions.homeAuto,
-        social: payload.permissions.social ?? relationship.permissions.social,
+        digital: payload.permissions.digital ?? relationship.permissions.digital,
       };
     }
 

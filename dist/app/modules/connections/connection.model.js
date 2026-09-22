@@ -64,7 +64,7 @@ const connectionSchema = new mongoose_1.default.Schema({
                     "medical",
                     "financial",
                     "home-auto",
-                    "social",
+                    "digital",
                     "personal",
                 ],
             },

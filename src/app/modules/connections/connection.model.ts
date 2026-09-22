@@ -61,7 +61,7 @@ const connectionSchema = new mongoose.Schema(
             "medical",
             "financial",
             "home-auto",
-            "social",
+            "digital",
             "personal",
           ],
         },

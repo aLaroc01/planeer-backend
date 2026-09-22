@@ -16,7 +16,7 @@ export interface IPermissions {
   medical: boolean;
   financial: boolean;
   homeAuto: boolean;
-  social: boolean;
+  digital: boolean;
 }
 
 export interface IProxyRelationship {
@@ -57,7 +57,7 @@ const permissionsSchema = new Schema<IPermissions>(
     medical: { type: Boolean, default: false },
     financial: { type: Boolean, default: false },
     homeAuto: { type: Boolean, default: false },
-    social: { type: Boolean, default: false },
+    digital: { type: Boolean, default: false },
   },
   { _id: false }
 );

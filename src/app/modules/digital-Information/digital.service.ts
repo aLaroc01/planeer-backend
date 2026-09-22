@@ -1,12 +1,12 @@
 import { Request } from "express";
-import { SocialInfoModel } from "./social.model";
+import { DigitalInfoModel } from "./digital.model";
 
 
 
 
 
 
-export const SocialInformationService = async (req: Request) => {
+export const DigitalInformationService = async (req: Request) => {
   try {
     let user_id = req.user?.id;
     let requestBody = req.body;
@@ -16,7 +16,7 @@ export const SocialInformationService = async (req: Request) => {
     const token = req.headers.authorization?.split(" ")[1] || null;
 
     const allFields = [
-      requestBody.socialMedia,
+      requestBody.digitalMedia,
       requestBody.website,
       requestBody.streamingService
      
@@ -29,11 +29,11 @@ export const SocialInformationService = async (req: Request) => {
     const completenessPercentage = (filledFields / totalFields) * 100;
 
   
-    const updatedMedicalData = await SocialInfoModel.findOneAndUpdate(
+    const updatedMedicalData = await DigitalInfoModel.findOneAndUpdate(
       { userID: user_id },
          { 
         ...requestBody, 
-        socialInfoPercentage: completenessPercentage  
+        digitalInfoPercentage: completenessPercentage  
       },
       { upsert: true, new: true }
     );
@@ -41,7 +41,7 @@ export const SocialInformationService = async (req: Request) => {
     return {
       status: "success",
       message: `Medical data updated successfully ${completenessPercentage.toFixed(2)}%`,
-      socialInfoPercentage: completenessPercentage.toFixed(2),  
+      digitalInfoPercentage: completenessPercentage.toFixed(2),  
       updatedMedicalData,
       token: token
      
@@ -56,7 +56,7 @@ export const SocialInformationService = async (req: Request) => {
 
 
 
-export const SocialGetService = async (req: Request) => {
+export const DigitalGetService = async (req: Request) => {
   try {
 
     const user_id = req.user?.id;
@@ -66,7 +66,7 @@ export const SocialGetService = async (req: Request) => {
     }
 
 
-    const financialData = await SocialInfoModel.findOne(
+    const financialData = await DigitalInfoModel.findOne(
       { userID: user_id },
       "-createdAt -updatedAt"
     );
