@@ -21,8 +21,7 @@ export interface PROFILE extends Document {
   zipcode: string;
   phoneNumber: string;
   mainRole: ProfileMainRole;
-
-  profilePercentage: number;
+  imgUrl?: string | null;
 
   suggestions: ISuggestionProgress[];
 

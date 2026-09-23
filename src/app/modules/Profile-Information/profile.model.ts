@@ -13,6 +13,7 @@ const profileSchema =  new Schema<PROFILE>({
     state: { type: String, default: "" },
     zipcode: {type: String, default: "" },
     phoneNumber: {  type: String, default: ""  }, 
+    imgUrl: { type: String, default: null },
     mainRole: { 
         type: String,
         enum: ["GRANTOR", "PROXY"],

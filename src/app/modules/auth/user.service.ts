@@ -292,7 +292,7 @@ export const userSelfUpdateService = async (req: Request) => {
     if (req.body.yearStarted !== undefined) updateData.yearStarted = req.body.yearStarted;
     if (req.body.email !== undefined) updateData.email = req.body.email.toLowerCase();
     if (req.body.phoneNumber !== undefined) updateData.phoneNumber = req.body.phoneNumber;
-    // if (req.body.imgUrl !== undefined) updateData.imgUrl = req.body.imgUrl;
+    if (req.body.imgUrl !== undefined) updateData.imgUrl = req.body.imgUrl;
     
     // const uploadedFile = (req as any).file;
     // if (uploadedFile?.path) {
@@ -316,17 +316,6 @@ export const userSelfUpdateService = async (req: Request) => {
       updateData.imgUrl,
     ];
 
-    const filledFields = fields.filter((field) => {
-      if (field === undefined || field === null) return false;
-      if (typeof field === "string") return field.trim() !== "";
-      return true;
-    }).length;
-
-    const totalFields = fields.length;
-    const userPercentage = Math.round((filledFields / totalFields) * 100);
-
-    updateData.userPercentage = userPercentage;
-
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { $set: updateData },
@@ -341,7 +330,6 @@ export const userSelfUpdateService = async (req: Request) => {
       status: "success",
       message: "Profile updated successfully",
       data: updatedUser,
-      userPercentage,
     };
   } catch (error: any) {
     return { status: "failed", message: error.message };

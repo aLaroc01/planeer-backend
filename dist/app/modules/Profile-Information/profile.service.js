@@ -65,6 +65,7 @@ const ProfileUpdateService = async (req) => {
             updateData.state = state.trim();
         if (dateOfBirth?.trim())
             updateData.dateOfBirth = dateOfBirth.trim();
+        
         let finalImageUrl = imgUrl || null;
         const files = req.files;
         if (files?.image) {
