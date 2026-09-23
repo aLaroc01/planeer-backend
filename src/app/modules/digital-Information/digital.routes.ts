@@ -2,7 +2,7 @@
 
 import express from "express";
 
-import { auth } from './../../middleware/auth.middleware';
+import { auth } from '../../middleware/auth.middleware';
 
 import { GetDigitalData, DigitalInformation } from "./digital.controller";
 

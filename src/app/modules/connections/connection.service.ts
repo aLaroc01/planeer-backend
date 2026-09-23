@@ -46,80 +46,139 @@ const canAddProxyForGrantor = async (grantorId: string, proxyUserId?: string | n
  * Helper: enforce proxy-side limit (max 2 grantors per proxy)
  */
 export const canAddGrantorForProxy = async (req: Request) => {
-   const currentUserId = req.user?.id;
-   const proxySearchEmail = String(req.body.proxyEmail || "").trim().toLowerCase();
+  try {
+    const currentUserId = req.user?.id;
 
-   
-   if (!currentUserId) {
-    return { ok: false, message: "Unauthorized" };
-  }
+    const proxySearchEmail = String(
+      req.body?.proxyEmail || "",
+    )
+      .trim()
+      .toLowerCase();
 
-  if (!proxySearchEmail) {
-    return { ok: false, message: "Proxy email is required" };
-  }
+    if (!currentUserId) {
+      return {
+        status: "failed",
+        message: "Unauthorized.",
+      };
+    }
 
-  const activeProxyCount = await Connection.countDocuments({
-    proxyEmail: proxySearchEmail,
-    status: { $in: ["active", "invited", "PENDING VERIFICATION", "ACTIVE"] },
-  });
+    if (!proxySearchEmail) {
+      return {
+        status: "failed",
+        message: "Proxy email is required.",
+      };
+    }
 
+    /*
+      Step 1: Find the actual Planeer User account by email.
 
-  if (activeProxyCount >= 2) {
-    return { ok: false, message: "This proxy already has 2 grantors" };
-  }
+      Do not use Connection to decide whether the email belongs
+      to a user. A user can have zero connections.
+    */
+    const proxyUser = await User.findOne({
+      email: proxySearchEmail,
+    })
+      .select("_id email imgUrl")
+      .lean();
 
-  if (activeProxyCount === 0 ) {
-    return { ok: false, message: "There is no user with this email"};
-  }
+    /*
+      This is not an application failure. It means the email does not
+      yet belong to a registered Planeer user, so the frontend should
+      offer Send Invite.
+    */
+    if (!proxyUser) {
+      return {
+        status: "success",
+        data: {
+          ok: true,
+          userExists: false,
+          proxyUserId: null,
+          profile: null,
+        },
+      };
+    }
 
-// 2) Check if *this* grantor is already connected to this proxy
-  const existingConnection = await Connection.findOne({
-    proxyEmail: proxySearchEmail,
-    grantorId: currentUserId,
-    status: { $in: ["active", "invited"] },
-  });
+    /*
+      Step 2: Count only existing pending/active grantor relationships
+      for that registered proxy.
+    */
+    const activeGrantorCount = await Connection.countDocuments({
+      proxyUserId: proxyUser._id,
+      status: { $in: ["active", "invited"] },
+    });
 
-  if (existingConnection) {
+    if (activeGrantorCount >= 2) {
+      return {
+        status: "failed",
+        message: "This proxy already has 2 grantors.",
+      };
+    }
+
+    /*
+      Step 3: Prevent the same grantor from inviting/linking
+      the same person again.
+    */
+    const existingConnection = await Connection.findOne({
+      grantorId: currentUserId,
+      $or: [
+        { proxyUserId: proxyUser._id },
+        { proxyEmail: proxySearchEmail },
+      ],
+      status: { $in: ["active", "invited"] },
+    }).lean();
+
+    if (existingConnection) {
+      return {
+        status: "failed",
+        message:
+          "You are already connected to or have invited this person.",
+      };
+    }
+
+    /*
+      Step 4: Read display-profile fields independently.
+      A User may exist before their Profile has been completed,
+      so a missing profile should not make the search fail.
+    */
+    const profile = await ProfileModel.findOne({
+      userID: proxyUser._id,
+    })
+      .select("firstName lastName city state imgUrl")
+      .lean();
+
     return {
-      ok: false,
-      message: "You are already connected or have invited this proxy",
+      status: "success",
+      data: {
+        ok: true,
+        userExists: true,
+
+        // This is the exact User ID the frontend must send
+        // as proxyUserId when creating the Connection.
+        proxyUserId: proxyUser._id,
+
+        profile: {
+          firstName: profile?.firstName || "",
+          lastName: profile?.lastName || "",
+          email: proxyUser.email,
+          city: profile?.city || "",
+          state: profile?.state || "",
+
+          /*
+            Use Profile imgUrl as the source of truth now,
+            but fall back to the legacy User field in case
+            old records still carry it there.
+          */
+          imgUrl: profile?.imgUrl || proxyUser.imgUrl || "",
+        },
+      },
+    };
+  } catch (error: any) {
+    return {
+      status: "failed",
+      message:
+        error?.message || "Unable to search for this proxy.",
     };
   }
-
-  const proxyIdFound = await Connection.findOne({
-    proxyEmail: proxySearchEmail,
-    status: { $in: ["active", "invited"] },
-  });
-
-
-  const profile = await ProfileModel.findOne({ userID: proxyIdFound.proxyUserId, }).select(
-      "firstName lastName city state"
-    );
-
-  const userImg = await User.findOne({_id: proxyIdFound.proxyUserId, }). select(
-    "imgUrl"
-  );
-
-
-// console.log("info stuff:", profile?.firstName, profile?.lastName, profile?.city, profile?.state, userImg?.imgUrl)
-
-  return {
-    status: "success",
-    data: {
-      ok: true,
-      userExists: Boolean(profile),
-      profile: profile
-        ? {
-            firstName: profile.firstName,
-            lastName: profile.lastName,
-            city: profile.city,
-            state: profile.state,
-            imgUrl: userImg?.imgUrl,
-            proxyId: proxyIdFound.proxyUserId,
-          }
-        : null,
-    },
-  };
 };
 
 /**

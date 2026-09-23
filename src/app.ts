@@ -4,6 +4,7 @@ import helmet from "helmet";
 import path from "path";
 import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
+import fs from "fs";
 
 // Routes
 import { userRoutes } from "./app/modules/auth/user.routes";
@@ -187,9 +188,13 @@ app.use("/uploads", (req: Request, res: Response, next: NextFunction) => {
   return next();
 });
 
+const uploadsDir =
+  process.env.UPLOADS_DIR ||
+  path.join(process.cwd(), "uploads");
+
 app.use(
   "/uploads",
-  express.static(path.join(process.cwd(), "uploads"), {
+  express.static(uploadsDir, {
     setHeaders: (res: Response) => {
       res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     },
@@ -207,6 +212,18 @@ app.get("/health", (_req: Request, res: Response) => {
   return res.status(200).json({
     status: "ok",
     timestamp: new Date().toISOString(),
+  });
+});
+
+app.get("/debug/uploads", (_req, res) => {
+  const files = fs.existsSync(uploadsDir)
+    ? fs.readdirSync(uploadsDir)
+    : [];
+
+  res.json({
+    uploadsDir,
+    exists: fs.existsSync(uploadsDir),
+    files,
   });
 });
 
