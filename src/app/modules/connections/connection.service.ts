@@ -1,5 +1,5 @@
 import { Request } from "express";
-import crypto from "crypto";
+import { Types } from "mongoose";
 import Connection from "./connection.model";
 import { User } from "../auth/user.model";
 import { ProfileModel } from "../Profile-Information/profile.model";
@@ -206,101 +206,125 @@ export const canAddGrantorForProxy = async (req: Request) => {
 // };
 
 export const getConnectionsForUserService = async (req: Request) => {
+   const currentUserId = req.user?.id;
   try {
-    const currentUserId = req.user?.id;
-
     if (!currentUserId) {
-      return { status: "failed", message: "Unauthorized" };
-    }
-
-    // 1) Find all connections where current user is grantor OR proxy
-    const connections = await Connection.find({
-      $or: [
-        { grantorId: currentUserId },
-        { proxyUserId: currentUserId },
-      ],
-    });
-
-    if (!connections.length) {
       return {
-        status: "success",
-        message: "No connections found",
-        data: [],
+        status: "failed",
+        message: "Current user not found.",
       };
     }
 
-    // 2) Collect all "other user" ids (the person on the other side)
-    const otherUserIds: string[] = [];
+    const currentUserObjectId = new Types.ObjectId(currentUserId);
 
-    connections.forEach((conn) => {
-      const isGrantor = String(conn.grantorId) === String(currentUserId);
-      const otherId = isGrantor ? conn.proxyUserId : conn.grantorId;
+    const connections = await Connection.find({
+      $or: [
+        { grantorId: currentUserObjectId },
+        { proxyUserId: currentUserObjectId },
+      ],
+      status: {
+        $in: ["invited", "active"],
+      },
+    })
+      .sort({ createdAt: -1 })
+      .lean();
 
-      if (otherId) {
-        otherUserIds.push(String(otherId));
-      }
-    });
+    const otherUserIds = connections
+      .map((connection) => {
+        const viewerIsGrantor =
+          String(connection.grantorId) === String(currentUserObjectId);
 
-    // 3) Fetch profiles for those other users
-    const otherProfiles = await ProfileModel.find({
-      userID: { $in: otherUserIds },
-    }).select("userID firstName lastName mainRole address city state");
+        return viewerIsGrantor
+          ? connection.proxyUserId
+          : connection.grantorId;
+      })
+      .filter(Boolean)
+      .map((id) => new Types.ObjectId(String(id)));
 
-    // 4) Fetch user images for those other users
-    const otherUsers = await User.find({
-      _id: { $in: otherUserIds },
-    }).select("_id imgUrl");
+    const uniqueOtherUserIds = [
+      ...new Map(
+        otherUserIds.map((id) => [String(id), id]),
+      ).values(),
+    ];
 
-    // Build maps: userID -> profile / user
-    const profileMap = new Map(
-      otherProfiles.map((p) => [String(p.userID), p])
+    const [otherUsers, otherProfiles] = await Promise.all([
+      User.find({
+        _id: { $in: uniqueOtherUserIds },
+      })
+        .select("_id email")
+        .lean(),
+
+      ProfileModel.find({
+        userID: { $in: uniqueOtherUserIds },
+      })
+        .select("userID firstName lastName city state imgUrl")
+        .lean(),
+    ]);
+
+    const usersById = new Map(
+      otherUsers.map((user) => [String(user._id), user]),
     );
 
-    const userImgMap = new Map(
-      otherUsers.map((u) => [String(u._id), u.imgUrl])
+    const profilesByUserId = new Map(
+      otherProfiles.map((profile) => [
+        String(profile.userID),
+        profile,
+      ]),
     );
 
-    // 5) Shape the result as: viewer vs otherUser
-    const shaped = connections.map((conn) => {
+    const formattedConnections = connections.map((connection) => {
       const viewerIsGrantor =
-        String(conn.grantorId) === String(currentUserId);
+        String(connection.grantorId) ===
+        String(currentUserObjectId);
 
-      const viewerRole = viewerIsGrantor ? "GRANTOR" : "PROXY";
-      const otherUserId = viewerIsGrantor ? conn.proxyUserId : conn.grantorId;
-      const otherRole = viewerIsGrantor ? "PROXY" : "GRANTOR";
+      const otherUserId = viewerIsGrantor
+        ? connection.proxyUserId
+        : connection.grantorId;
 
-      const profile = otherUserId
-        ? profileMap.get(String(otherUserId))
+      const otherUser = otherUserId
+        ? usersById.get(String(otherUserId))
         : null;
 
-      const imgUrl = otherUserId
-        ? userImgMap.get(String(otherUserId))
-        : undefined;
+      const otherProfile = otherUserId
+        ? profilesByUserId.get(String(otherUserId))
+        : null;
 
       return {
-        _id: conn._id,
-        status: conn.status,
-        viewerRole,       // role of current user in this connection
-        otherUserRole: otherRole, // role of the other side
-        otherUserId,
-        otherFirstName: profile?.firstName || "",
-        otherLastName: profile?.lastName || "",
-        otherAddress: profile?.address || "",
-        city: profile?.city || "",
-        state: profile?.state || "",
-        imgUrl: imgUrl || "",
+        _id: connection._id,
+        status: connection.status,
+        createdAt: connection.createdAt,
+        updatedAt: connection.updatedAt,
+
+        viewerRole: viewerIsGrantor ? "grantor" : "proxy",
+
+        otherPerson: {
+          userId: otherUserId || null,
+
+          // The email fallback is essential for a newly invited,
+          // not-yet-registered proxy.
+          email:
+            otherUser?.email ||
+            (viewerIsGrantor ? connection.proxyEmail : null) ||
+            "",
+
+          firstName: otherProfile?.firstName || "",
+          lastName: otherProfile?.lastName || "",
+          city: otherProfile?.city || "",
+          state: otherProfile?.state || "",
+          imgUrl: otherProfile?.imgUrl || "",
+        },
       };
     });
 
     return {
       status: "success",
-      message: "Connections retrieved successfully",
-      data: shaped,
+      data: formattedConnections,
     };
   } catch (error: any) {
     return {
       status: "failed",
-      message: error.message || "Something went wrong",
+      message:
+        error?.message || "Unable to retrieve connections.",
     };
   }
 };
