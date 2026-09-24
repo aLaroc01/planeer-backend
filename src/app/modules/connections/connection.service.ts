@@ -399,19 +399,10 @@ export const sendConnectionRequestService = async (req: Request) => {
   // const body = req.body.body;
   const proxyEmail = String(req.body?.proxyEmail || "")
   .trim()
-  .toLowerCase();;
-  const proxyId = req.body.proxyUserId || null;
-  console.log("got the info:", proxyEmail, proxyId);
+  .toLowerCase();
 try {
   if (!currentUserId) {
       return { ok: false, message: "Current user not found" };
-    }
-
-    if (!proxyId) {
-      return {
-        status: "failed",
-        message: "A registered proxy user is required.",
-      };
     }
 
   const existingConnection = await Connection.findOne({
@@ -438,7 +429,7 @@ try {
     const connection = await Connection.create({
         grantorId: currentUserId,
         proxyEmail: proxyEmail,
-        proxyUserId: proxyId, // will be set when proxy finishes signup
+        proxyUserId: "", // will be set when proxy finishes signup
         status: "invited",
         otpPurpose: null,
       });
