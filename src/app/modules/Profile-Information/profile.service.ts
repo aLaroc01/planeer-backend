@@ -71,7 +71,7 @@ export const ProfileUpdateService = async (req: Request) => {
   console.log("FILES RAW:", (req as any).files);
   try {
     const { firstName, lastName, dateOfBirth, address, city, state, zip, phoneNumber, imgUrl } = req.body;
-    const user_id = req.user?.id;
+    const user_id = req.user?._id;
 
     if (!user_id) {
       return {
