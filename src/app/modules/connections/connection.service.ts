@@ -388,44 +388,50 @@ export const getConnectionsForUserService = async (req: Request) => {
   }
 };
 
-
-
 // Update the connections.emergencyPermissions
 // export const emergencyPermissionsUpdateService = async (req: Request) => {
 //
 // }
 
-
-
-
 // check if connection exist, check limit, if (no) to both then create connection request
 export const sendConnectionRequestService = async (req: Request) => {
-
-  const currentUserId = req.user?._id;
+  const currentUserId = req.user?.id;
   // const body = req.body.body;
-  const proxyEmail = req.body.proxyEmail;
-  const proxyId = req.body.proxyUserId;
+  const proxyEmail = String(req.body?.proxyEmail || "")
+  .trim()
+  .toLowerCase();;
+  const proxyId = req.body.proxyUserId || null;
   console.log("got the info:", proxyEmail, proxyId);
 try {
   if (!currentUserId) {
       return { ok: false, message: "Current user not found" };
     }
 
-  const currentUser = await Connection.findOne({
-     grantorId: currentUserId,
-     proxyEmail: proxyEmail,
-  })
+    if (!proxyId) {
+      return {
+        status: "failed",
+        message: "A registered proxy user is required.",
+      };
+    }
+
+  const existingConnection = await Connection.findOne({
+    grantorId: currentUserId,
+    proxyEmail,
+    status: {
+      $in: ["active", "invited"],
+    },
+  }).lean();
   
-    if (currentUser) {
+    if (existingConnection) {
       return { ok: false, message: "You're already connected to this user" };
     }
     
-    const activeProxyCount = await Connection.countDocuments({
-      grantorId: currentUserId,
+    const activeGrantorCount = await Connection.countDocuments({
+      proxyEmail,
       status: { $in: ["active", "invited"] },
     });
 
-    if (activeProxyCount >= 2) {
+    if (activeGrantorCount >= 2) {
       return { ok: false, message: "You can only have 2 proxies" };
     }
 
