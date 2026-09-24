@@ -407,7 +407,6 @@ export const sendConnectionRequestService = async (req: Request) => {
   const proxyId = req.body.proxyUserId;
   console.log("got the info:", proxyEmail, proxyId);
 try {
-  // console.log("user info:", req.body);
   if (!currentUserId) {
       return { ok: false, message: "Current user not found" };
     }
