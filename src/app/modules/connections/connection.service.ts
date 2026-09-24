@@ -45,11 +45,13 @@ const canAddProxyForGrantor = async (grantorId: string, proxyUserId?: string | n
 /**
  * Helper: enforce proxy-side limit (max 2 grantors per proxy)
  */
-export const canAddGrantorForProxy = async (req: Request) => {
+export const canAddGrantorForProxy = async (
+  req: Request,
+) => {
   try {
     const currentUserId = req.user?.id;
 
-    const proxySearchEmail = String(
+    const proxyEmail = String(
       req.body?.proxyEmail || "",
     )
       .trim()
@@ -62,69 +64,32 @@ export const canAddGrantorForProxy = async (req: Request) => {
       };
     }
 
-    if (!proxySearchEmail) {
+    if (!proxyEmail) {
       return {
         status: "failed",
         message: "Proxy email is required.",
       };
     }
 
-    /*
-      Step 1: Find the actual Planeer User account by email.
-
-      Do not use Connection to decide whether the email belongs
-      to a user. A user can have zero connections.
-    */
     const proxyUser = await User.findOne({
-      email: proxySearchEmail,
+      email: proxyEmail,
     })
-      .select("_id email imgUrl")
+      .select("_id email")
       .lean();
 
-    /*
-      This is not an application failure. It means the email does not
-      yet belong to a registered Planeer user, so the frontend should
-      offer Send Invite.
-    */
     if (!proxyUser) {
       return {
-        status: "success",
-        data: {
-          ok: true,
-          userExists: false,
-          proxyUserId: null,
-          profile: null,
-        },
-      };
-    }
-
-    /*
-      Step 2: Count only existing pending/active grantor relationships
-      for that registered proxy.
-    */
-    const activeGrantorCount = await Connection.countDocuments({
-      proxyUserId: proxyUser._id,
-      status: { $in: ["active", "invited"] },
-    });
-
-    if (activeGrantorCount >= 2) {
-      return {
         status: "failed",
-        message: "This proxy already has 2 grantors.",
+        message: "No Planeer user exists with this email.",
       };
     }
 
-    /*
-      Step 3: Prevent the same grantor from inviting/linking
-      the same person again.
-    */
     const existingConnection = await Connection.findOne({
       grantorId: currentUserId,
-      $or: [
-        { proxyUserId: proxyUser._id },
-        { proxyEmail: proxySearchEmail },
-      ],
-      status: { $in: ["active", "invited"] },
+      proxyUserId: proxyUser._id,
+      status: {
+        $in: ["invited", "active"],
+      },
     }).lean();
 
     if (existingConnection) {
@@ -135,15 +100,32 @@ export const canAddGrantorForProxy = async (req: Request) => {
       };
     }
 
+    const proxyGrantorCount =
+      await Connection.countDocuments({
+        proxyUserId: proxyUser._id,
+        status: {
+          $in: ["invited", "active"],
+        },
+      });
+
     /*
-      Step 4: Read display-profile fields independently.
-      A User may exist before their Profile has been completed,
-      so a missing profile should not make the search fail.
+      0 connections → invitation allowed
+      1 connection  → invitation allowed
+      2 connections → blocked
     */
+    if (proxyGrantorCount >= 2) {
+      return {
+        status: "failed",
+        message: "This proxy already has 2 grantors.",
+      };
+    }
+
     const profile = await ProfileModel.findOne({
       userID: proxyUser._id,
     })
-      .select("firstName lastName city state imgUrl")
+      .select(
+        "firstName lastName city state imgUrl",
+      )
       .lean();
 
     return {
@@ -151,32 +133,30 @@ export const canAddGrantorForProxy = async (req: Request) => {
       data: {
         ok: true,
         userExists: true,
-
-        // This is the exact User ID the frontend must send
-        // as proxyUserId when creating the Connection.
-        proxyUserId: proxyUser._id,
-
+        proxyUserId: String(proxyUser._id),
+        currentGrantorCount: proxyGrantorCount,
+        remainingGrantorSlots: 2 - proxyGrantorCount,
         profile: {
           firstName: profile?.firstName || "",
           lastName: profile?.lastName || "",
           email: proxyUser.email,
           city: profile?.city || "",
           state: profile?.state || "",
-
-          /*
-            Use Profile imgUrl as the source of truth now,
-            but fall back to the legacy User field in case
-            old records still carry it there.
-          */
-          imgUrl: profile?.imgUrl || proxyUser.imgUrl || "",
+          imgUrl: profile?.imgUrl || "",
         },
       },
     };
   } catch (error: any) {
+    console.error(
+      "canAddGrantorForProxy error:",
+      error,
+    );
+
     return {
       status: "failed",
       message:
-        error?.message || "Unable to search for this proxy.",
+        error?.message ||
+        "Unable to search for this proxy.",
     };
   }
 };
@@ -400,98 +380,81 @@ export const sendConnectionRequestService = async (
   try {
     const currentUserId = req.user?.id;
 
+    const proxyEmail = String(
+      req.body?.proxyEmail || "",
+    )
+      .trim()
+      .toLowerCase();
+
+    const proxyUserId = String(
+      req.body?.proxyUserId || "",
+    ).trim();
+
     if (!currentUserId) {
       return {
         status: "failed",
-        message: "Unauthorized.",
-        data: [],
+        message: "Current user not found.",
       };
     }
 
-    const connections = await Connection.find({
+    if (!proxyEmail || !proxyUserId) {
+      return {
+        status: "failed",
+        message:
+          "A proxy email and proxy user ID are required.",
+      };
+    }
+
+    const existingConnection = await Connection.findOne({
       grantorId: currentUserId,
+      proxyUserId,
       status: {
         $in: ["invited", "active"],
       },
-    })
-      .sort({
-        createdAt: -1,
-      })
-      .lean();
+    }).lean();
 
-    if (!connections.length) {
+    if (existingConnection) {
       return {
-        status: "success",
-        message: "No connections found.",
-        data: [],
+        status: "failed",
+        message:
+          "You are already connected to or have invited this person.",
       };
     }
 
-    const proxyUserIds = connections
-      .map((connection) => connection.proxyUserId)
-      .filter(Boolean);
+    const proxyGrantorCount =
+      await Connection.countDocuments({
+        proxyUserId,
+        status: {
+          $in: ["invited", "active"],
+        },
+      });
 
-    const profiles = await ProfileModel.find({
-      userID: {
-        $in: proxyUserIds,
-      },
-    })
-      .select(
-        "userID firstName lastName city state imgUrl",
-      )
-      .lean();
+    if (proxyGrantorCount >= 2) {
+      return {
+        status: "failed",
+        message:
+          "This proxy already has 2 grantors.",
+      };
+    }
 
-    const profileByUserId = new Map(
-      profiles.map((profile) => [
-        String(profile.userID),
-        profile,
-      ]),
-    );
-
-    const connectionData = connections.map(
-      (connection) => {
-        const proxyUserId = connection.proxyUserId
-          ? String(connection.proxyUserId)
-          : null;
-
-        const profile = proxyUserId
-          ? profileByUserId.get(proxyUserId)
-          : null;
-
-        return {
-          connectionId: String(connection._id),
-
-          grantorId: String(connection.grantorId),
-
-          proxyUserId,
-
-          proxyEmail: connection.proxyEmail || "",
-
-          status: connection.status,
-
-          createdAt: connection.createdAt,
-
-          profile: profile
-            ? {
-                firstName: profile.firstName || "",
-                lastName: profile.lastName || "",
-                city: profile.city || "",
-                state: profile.state || "",
-                imgUrl: profile.imgUrl || "",
-              }
-            : null,
-        };
-      },
-    );
+    const connection = await Connection.create({
+      grantorId: currentUserId,
+      proxyEmail,
+      proxyUserId,
+      status: "invited",
+      otpPurpose: null,
+    });
 
     return {
       status: "success",
-      message: "Connections retrieved successfully.",
-      data: connectionData,
+      message: "Connection request sent successfully.",
+      data: {
+        connection,
+      },
     };
   } catch (error: any) {
     console.error(
-      "getConnectionsForUserService error:",
+      "sendConnectionRequestService error:",
       error,
     );
 
@@ -499,8 +462,7 @@ export const sendConnectionRequestService = async (
       status: "failed",
       message:
         error?.message ||
-        "Unable to retrieve connections.",
-      data: [],
+        "Unable to send connection request.",
     };
   }
 };
