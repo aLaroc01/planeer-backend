@@ -399,9 +399,10 @@ export const sendConnectionRequestService = async (
 ) => {
   try {
     const currentUserId = req.user?.id;
+    const proxyId = req.body.data.profile.proxyUserId;
 
     const proxyEmail = String(
-      req.body?.proxyEmail || "",
+      req.body?.data.proxyEmail || "",
     )
       .trim()
       .toLowerCase();
@@ -420,9 +421,12 @@ export const sendConnectionRequestService = async (
       };
     }
 
+    console.log("proxyEmail", proxyEmail);
+    console.log("proxyUserId", proxyId);
+
     const existingConnection = await Connection.findOne({
       grantorId: currentUserId,
-      proxyEmail,
+      proxyUserId: proxyId,
       status: {
         $in: ["invited", "active"],
       },
@@ -453,7 +457,7 @@ export const sendConnectionRequestService = async (
 
     const connection = await Connection.create({
       grantorId: currentUserId,
-      proxyEmail,
+      proxyId,
       status: "invited",
       otpPurpose: null,
 
