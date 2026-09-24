@@ -401,7 +401,7 @@ export const getConnectionsForUserService = async (req: Request) => {
 // check if connection exist, check limit, if (no) to both then create connection request
 export const sendConnectionRequestService = async (req: Request) => {
 
-  const currentUserId = req.user?.id;
+  const currentUserId = req.user?._id;
   // const body = req.body.body;
   const proxyEmail = req.body.proxyEmail;
   const proxyId = req.body.proxyUserId;
