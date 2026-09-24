@@ -7,7 +7,7 @@ import path from "path";
 import fs from "fs";
 
 export const ProfileCreateService = async (req: Request) => {
-  const userId = req.user?.id;
+  const userId = req.user?._id || req.user?.id;
   const { data, onboardingType } = req.body;
 
   try {
@@ -26,7 +26,7 @@ export const ProfileCreateService = async (req: Request) => {
     }
 
     const existingProfile = await ProfileModel.findOne({
-      userID: userId,
+      userId: userId,
     });
 
     if (existingProfile) {
@@ -48,7 +48,7 @@ export const ProfileCreateService = async (req: Request) => {
 
     const profileCreate = await ProfileModel.create({
       ...data,
-      userID: userId,
+      userId: userId,
       mainRole,
     });
 
@@ -67,11 +67,12 @@ export const ProfileCreateService = async (req: Request) => {
 
 
 export const ProfileUpdateService = async (req: Request) => {
-  // console.log("BODY RAW:", req.body);
+  const user_id = req.user?._id || req.user?.id;
+  console.log("ProfileUpdateService called. User ID:", req.user);
   console.log("FILES RAW:", (req as any).files);
   try {
     const { firstName, lastName, dateOfBirth, address, city, state, zip, phoneNumber, imgUrl } = req.body;
-    const user_id = req.user?._id || req.user?.id;
+    
 
     if (!user_id) {
       return {
