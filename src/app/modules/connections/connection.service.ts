@@ -394,59 +394,94 @@ export const getConnectionsForUserService = async (req: Request) => {
 // }
 
 // check if connection exist, check limit, if (no) to both then create connection request
-export const sendConnectionRequestService = async (req: Request) => {
-  const currentUserId = req.user?.id;
-  // const body = req.body.body;
-  const proxyEmail = String(req.body?.proxyEmail || "")
-  .trim()
-  .toLowerCase();
-try {
-  if (!currentUserId) {
-      return { ok: false, message: "Current user not found" };
+export const sendConnectionRequestService = async (
+  req: Request,
+) => {
+  try {
+    const currentUserId = req.user?.id;
+
+    const proxyEmail = String(
+      req.body?.proxyEmail || "",
+    )
+      .trim()
+      .toLowerCase();
+
+    if (!currentUserId) {
+      return {
+        status: "failed",
+        message: "Current user not found.",
+      };
     }
 
-  const existingConnection = await Connection.findOne({
-    grantorId: currentUserId,
-    proxyEmail,
-    status: {
-      $in: ["active", "invited"],
-    },
-  }).lean();
-  
-    if (existingConnection) {
-      return { ok: false, message: "You're already connected to this user" };
+    if (!proxyEmail) {
+      return {
+        status: "failed",
+        message: "Proxy email is required.",
+      };
     }
-    
-    const activeGrantorCount = await Connection.countDocuments({
+
+    const existingConnection = await Connection.findOne({
+      grantorId: currentUserId,
       proxyEmail,
-      status: { $in: ["active", "invited"] },
-    });
+      status: {
+        $in: ["invited", "active"],
+      },
+    }).lean();
+
+    if (existingConnection) {
+      return {
+        status: "failed",
+        message:
+          "You are already connected to or have invited this email address.",
+      };
+    }
+
+    const activeGrantorCount =
+      await Connection.countDocuments({
+        proxyEmail,
+        status: {
+          $in: ["invited", "active"],
+        },
+      });
 
     if (activeGrantorCount >= 2) {
-      return { ok: false, message: "You can only have 2 proxies" };
+      return {
+        status: "failed",
+        message: "This proxy already has 2 grantors.",
+      };
     }
 
     const connection = await Connection.create({
-        grantorId: currentUserId,
-        proxyEmail: proxyEmail,
-        proxyUserId: "", // will be set when proxy finishes signup
-        status: "invited",
-        otpPurpose: null,
-      });
-      console.log("new connection request:", connection);
+      grantorId: currentUserId,
+      proxyEmail,
+      status: "invited",
+      otpPurpose: null,
 
-      return {
-        status: "success",
-        message: "Connection request sent successfully",
+      // Do not include proxyUserId here.
+      // Mongoose applies default: null.
+    });
+
+    return {
+      status: "success",
+      message: "Connection request sent successfully.",
+      data: {
         connection,
-      };
+      },
+    };
   } catch (error: any) {
+    console.error(
+      "sendConnectionRequestService error:",
+      error,
+    );
+
     return {
       status: "failed",
-      message: error.message || "Something went wrong",
+      message:
+        error?.message ||
+        "Unable to send connection request.",
     };
   }
-}
+};
 
 
 
