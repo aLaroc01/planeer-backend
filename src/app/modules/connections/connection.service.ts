@@ -381,13 +381,13 @@ export const sendConnectionRequestService = async (
     const currentUserId = req.user?.id;
 
     const proxyEmail = String(
-      req.body?.proxyEmail || "",
+      req.body?.data.proxyEmail || "",
     )
       .trim()
       .toLowerCase();
 
     const proxyUserId = String(
-      req.body?.proxyUserId || "",
+      req.body?.data.proxyUserId || "",
     ).trim();
 
     if (!currentUserId) {
