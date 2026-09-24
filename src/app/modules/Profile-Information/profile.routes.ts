@@ -9,7 +9,7 @@ const router = express.Router();
 router.post("/profile/create", auth, createProfile);
 
 // update profile information
-router.post("/profile/update", auth, UpdateProfile);
+router.patch("/profile/update", auth, UpdateProfile);
 
 // get profile information
 router.get("/getProfile", auth, GetProfileData);
