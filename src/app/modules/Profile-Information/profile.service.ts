@@ -70,7 +70,7 @@ export const ProfileUpdateService = async (req: Request) => {
   // console.log("BODY RAW:", req.body);
   console.log("FILES RAW:", (req as any).files);
   try {
-    const { firstName, lastName, dateOfBirth, address, city, state, zip, phoneNumber, imgUrl } = req.body;
+    const { firstName, lastName, dateOfBirth, address, city, state, zipcode, phoneNumber, imgUrl } = req.body;
     const user_id = req.user?.id;
 
     if (!user_id) {
@@ -89,7 +89,7 @@ export const ProfileUpdateService = async (req: Request) => {
     if (state?.trim()) updateData.state = state.trim();
     if (dateOfBirth?.trim()) updateData.dateOfBirth = dateOfBirth.trim();
     if (phoneNumber?.trim()) updateData.phoneNumber = phoneNumber.trim();
-    if (zip?.trim()) updateData.zip = zip.trim();
+    if (zipcode?.trim()) updateData.zipcode = zipcode.trim();
 
     let finalImageUrl = imgUrl || null;
 
