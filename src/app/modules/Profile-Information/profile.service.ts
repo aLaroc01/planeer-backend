@@ -68,7 +68,7 @@ export const ProfileCreateService = async (req: Request) => {
 
 export const ProfileUpdateService = async (req: Request) => {
   const user_id = req.user?._id || req.user?.id;
-  console.log("ProfileUpdateService called. User ID:", req.user);
+  console.log("ProfileUpdateService called. User ID:", user_id);
   console.log("FILES RAW:", (req as any).files);
   try {
     const { firstName, lastName, dateOfBirth, address, city, state, zip, phoneNumber, imgUrl } = req.body;
@@ -122,7 +122,7 @@ export const ProfileUpdateService = async (req: Request) => {
     }
 
     const updatedProfileData = await ProfileModel.findOneAndUpdate(
-      { userId: user_id },
+      { userID: user_id },
       { $set: updateData },
       { upsert: true, new: true }
     );
