@@ -67,7 +67,7 @@ export const ProfileCreateService = async (req: Request) => {
 
 
 export const ProfileUpdateService = async (req: Request) => {
-  const user_id = req.user?._id || req.user?.id;
+  const user_id = req.user?._id || req.body.userId || req.user?.id;
   console.log("ProfileUpdateService called. User ID:", user_id);
   console.log("FILES RAW:", (req as any).files);
   try {
