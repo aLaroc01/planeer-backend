@@ -71,7 +71,7 @@ export const ProfileUpdateService = async (req: Request) => {
   console.log("FILES RAW:", (req as any).files);
   try {
     const { firstName, lastName, dateOfBirth, address, city, state, zip, phoneNumber, imgUrl } = req.body;
-    const user_id = req.user?._id;
+    const user_id = req.user?._id || req.user?.id;
 
     if (!user_id) {
       return {
@@ -121,7 +121,7 @@ export const ProfileUpdateService = async (req: Request) => {
     }
 
     const updatedProfileData = await ProfileModel.findOneAndUpdate(
-      { userID: user_id },
+      { userId: user_id },
       { $set: updateData },
       { upsert: true, new: true }
     );
@@ -151,7 +151,7 @@ export const ProfileGetService = async (req: Request) => {
     }
 
     const profileData = await ProfileModel.findOne(
-      { userID: user_id },
+      { userId: user_id },
       "-createdAt -updatedAt"
     );
 
