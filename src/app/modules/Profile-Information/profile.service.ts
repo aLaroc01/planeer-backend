@@ -69,76 +69,76 @@ export const ProfileCreateService = async (req: Request) => {
 export const ProfileUpdateService = async (req: Request) => {
   const user_id = req.user?._id || req.body.userId || req.user?.id;
   console.log("ProfileUpdateService called. User ID:", user_id);
-  console.log("FILES RAW:", (req as any).files);
-  try {
-    const { firstName, lastName, dateOfBirth, address, city, state, zip, phoneNumber, imgUrl } = req.body;
+  // console.log("FILES RAW:", (req as any).files);
+  // try {
+  //   const { firstName, lastName, dateOfBirth, address, city, state, zip, phoneNumber, imgUrl } = req.body;
     
 
-    if (!user_id) {
-      return {
-        status: "failed",
-        message: "Unauthorized",
-      };
-    }
+  //   if (!user_id) {
+  //     return {
+  //       status: "failed",
+  //       message: "Unauthorized",
+  //     };
+  //   }
 
-    const updateData: any = {};
+  //   const updateData: any = {};
 
-    if (firstName?.trim()) updateData.firstName = firstName.trim();
-    if (lastName?.trim()) updateData.lastName = lastName.trim();
-    if (address?.trim()) updateData.address = address.trim();
-    if (city?.trim()) updateData.city = city.trim();
-    if (state?.trim()) updateData.state = state.trim();
-    if (dateOfBirth?.trim()) updateData.dateOfBirth = dateOfBirth.trim();
-    if (phoneNumber?.trim()) updateData.phoneNumber = phoneNumber.trim();
-    if (zip?.trim()) updateData.zip = zip.trim();
+  //   if (firstName?.trim()) updateData.firstName = firstName.trim();
+  //   if (lastName?.trim()) updateData.lastName = lastName.trim();
+  //   if (address?.trim()) updateData.address = address.trim();
+  //   if (city?.trim()) updateData.city = city.trim();
+  //   if (state?.trim()) updateData.state = state.trim();
+  //   if (dateOfBirth?.trim()) updateData.dateOfBirth = dateOfBirth.trim();
+  //   if (phoneNumber?.trim()) updateData.phoneNumber = phoneNumber.trim();
+  //   if (zip?.trim()) updateData.zip = zip.trim();
 
-    let finalImageUrl = imgUrl || null;
+  //   let finalImageUrl = imgUrl || null;
 
-    const files = (req as any).files;
-    if (files?.image) {
-      const file = Array.isArray(files.image) ? files.image[0] : files.image;
-      const uploadsDir = path.join(process.cwd(), "uploads");
+  //   const files = (req as any).files;
+  //   if (files?.image) {
+  //     const file = Array.isArray(files.image) ? files.image[0] : files.image;
+  //     const uploadsDir = path.join(process.cwd(), "uploads");
 
-      if (!fs.existsSync(uploadsDir)) {
-        fs.mkdirSync(uploadsDir, { recursive: true });
-      }
+  //     if (!fs.existsSync(uploadsDir)) {
+  //       fs.mkdirSync(uploadsDir, { recursive: true });
+  //     }
 
-      const originalName = file.name || "image.png";
-      const safeFileName = originalName
-        .replace(/[^a-zA-Z0-9.-]/g, "_")
-        .replace(/_+/g, "_");
+  //     const originalName = file.name || "image.png";
+  //     const safeFileName = originalName
+  //       .replace(/[^a-zA-Z0-9.-]/g, "_")
+  //       .replace(/_+/g, "_");
 
-      const safeName = `${Date.now()}-${safeFileName}`;
-      const uploadPath = path.join(uploadsDir, safeName);
+  //     const safeName = `${Date.now()}-${safeFileName}`;
+  //     const uploadPath = path.join(uploadsDir, safeName);
 
-      await file.mv(uploadPath);
-      console.log("Saved file path:", uploadPath);
-      console.log("Exists:", fs.existsSync(uploadPath));
-      finalImageUrl = `/uploads/${safeName}`;
-    }
+  //     await file.mv(uploadPath);
+  //     console.log("Saved file path:", uploadPath);
+  //     console.log("Exists:", fs.existsSync(uploadPath));
+  //     finalImageUrl = `/uploads/${safeName}`;
+  //   }
 
-    if (finalImageUrl) {
-      updateData.imgUrl = finalImageUrl;
-    }
+  //   if (finalImageUrl) {
+  //     updateData.imgUrl = finalImageUrl;
+  //   }
 
-    const updatedProfileData = await ProfileModel.findOneAndUpdate(
-      { userID: user_id },
-      { $set: updateData },
-      { upsert: true, new: true }
-    );
+  //   const updatedProfileData = await ProfileModel.findOneAndUpdate(
+  //     { userID: user_id },
+  //     { $set: updateData },
+  //     { upsert: true, new: true }
+  //   );
 
-    return {
-      status: "success",
-      message: "Profile data updated successfully",
-      updatedProfileData,
-    };
-  } catch (error: any) {
-    console.error("ProfileUpdateService error:", error);
-    return {
-      status: "failed",
-      message: error.message || "Failed to update profile",
-    };
-  }
+  //   return {
+  //     status: "success",
+  //     message: "Profile data updated successfully",
+  //     updatedProfileData,
+  //   };
+  // } catch (error: any) {
+  //   console.error("ProfileUpdateService error:", error);
+  //   return {
+  //     status: "failed",
+  //     message: error.message || "Failed to update profile",
+  //   };
+  // }
 };
 
 
