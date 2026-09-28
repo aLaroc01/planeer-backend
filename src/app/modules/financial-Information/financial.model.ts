@@ -1,22 +1,73 @@
+import { model, Schema } from "mongoose";
+import {
+  FINANCIAL,
+  IFinancialItem,
+} from "./financial.interface";
 
-// for mongoose model
+const financialItemSchema = new Schema<IFinancialItem>(
+  {
+    itemType: {
+      type: String,
+      enum: ["account", "retirementAccount", "asset", "debt"],
+      required: true,
+    },
 
-import { model, Schema, Types } from 'mongoose'
-import { FINANCIAL } from './financial.interface';
+    institution: {
+      type: String,
+      trim: true,
+      required: function (this: IFinancialItem) {
+        return this.itemType === "account";
+      },
+    },
 
+    accountType: {
+      type: String,
+      trim: true,
+      required: function (this: IFinancialItem) {
+        return this.itemType === "account";
+      },
+    },
 
+    amountCents: {
+      type: Number,
+      min: 0,
+      required: function (this: IFinancialItem) {
+        return this.itemType === "account";
+      },
+      validate: {
+        validator: (value: number | undefined) =>
+          value == null || Number.isSafeInteger(value),
+        message: "Amount must be a whole number of cents.",
+      },
+    },
+  },
+  {
+    timestamps: true,
+    // Leave _id enabled so each item can be edited/deleted by ID.
+  }
+);
 
+const financialSchema = new Schema<FINANCIAL>(
+  {
+    userID: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
 
-const financialSchema =  new Schema<FINANCIAL>({
-    bankAccount: { type: String, required: true },
-    retirementAccount: { type: String, required: true },
-    currentAssets: { type: String, required: true },
-    debt: { type: String, required: true },
-    financialPercentage: { type: Number },
-    userID: { type: Types.ObjectId,   ref: 'User', required: true},
+    items: {
+      type: [financialItemSchema],
+      default: [],
+    },
+  },
+  {
+    timestamps: true,
+    versionKey: false,
+  }
+);
 
-    },{
-    timestamps: true,versionKey: false
-})
-
-export const FinancialModel = model<FINANCIAL>("financial", financialSchema);
+export const FinancialModel = model<FINANCIAL>(
+  "financial",
+  financialSchema
+);

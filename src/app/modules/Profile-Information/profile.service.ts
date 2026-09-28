@@ -96,7 +96,9 @@ export const ProfileUpdateService = async (req: Request) => {
     const files = (req as any).files;
     if (files?.image) {
       const file = Array.isArray(files.image) ? files.image[0] : files.image;
-      const uploadsDir = path.join(process.cwd(), "uploads");
+      const uploadsDir =
+        process.env.UPLOADS_DIR ||
+        path.join(process.cwd(), "uploads");
 
       if (!fs.existsSync(uploadsDir)) {
         fs.mkdirSync(uploadsDir, { recursive: true });
