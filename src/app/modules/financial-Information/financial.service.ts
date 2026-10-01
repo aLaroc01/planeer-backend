@@ -6,6 +6,7 @@ import { DigitalInfoModel } from "../digital-Information/digital.model";
 import { FinancialModel } from "./financial.model";
 import { Request } from "express";
 import Connection from "../connections/connection.model";
+import { Types } from "mongoose";
 
 
 export const getFinancialForProxy = async (
@@ -39,6 +40,91 @@ export const FinancialUpdateService = async (req: Request) => {
     requestBody.userID = user_id;
      
     const token = req.headers.authorization?.split(" ")[1] || null;
+
+    if (Array.isArray(req.body?.items)) {
+      const allowedTypes = new Set([
+        "account",
+        "retirementAccount",
+        "asset",
+        "debt",
+      ]);
+
+      const items = req.body.items.map((item: any) => {
+        if (
+          !item ||
+          typeof item !== "object" ||
+          !allowedTypes.has(item.itemType)
+        ) {
+          throw new Error("Invalid financial item type.");
+        }
+
+        if (
+          item._id !== undefined &&
+          !Types.ObjectId.isValid(item._id)
+        ) {
+          throw new Error("Invalid financial item ID.");
+        }
+
+        if (
+          item.amountCents !== undefined &&
+          (!Number.isSafeInteger(item.amountCents) ||
+            item.amountCents < 0)
+        ) {
+          throw new Error("Invalid financial item amount.");
+        }
+
+        const cleaned: Record<string, unknown> = {
+          itemType: item.itemType,
+          details:
+            typeof item.details === "string"
+              ? item.details.trim()
+              : "",
+          institution:
+            typeof item.institution === "string"
+              ? item.institution.trim()
+              : "",
+          accountType:
+            typeof item.accountType === "string"
+              ? item.accountType.trim()
+              : "",
+          assetType:
+            typeof item.assetType === "string"
+              ? item.assetType.trim()
+              : "",
+          debtType:
+            typeof item.debtType === "string"
+              ? item.debtType.trim()
+              : "",
+        };
+
+        if (item._id !== undefined) {
+          cleaned._id = item._id;
+        }
+
+        if (item.amountCents !== undefined) {
+          cleaned.amountCents = item.amountCents;
+        }
+
+        return cleaned;
+      });
+
+      const updatedFinancialData =
+        await FinancialModel.findOneAndUpdate(
+          { userID: user_id },
+          { $set: { items } },
+          {
+            upsert: true,
+            new: true,
+            runValidators: true,
+          }
+        );
+
+      return {
+        status: "success",
+        message: "Financial items updated successfully",
+        data: updatedFinancialData,
+      };
+    }
  
     const allFields = [
       requestBody.bankAccount,
