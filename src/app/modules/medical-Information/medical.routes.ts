@@ -6,33 +6,14 @@ import { GetMedicalData, UpdateMedical } from "./medical.controller";
 
 
 
-
-
-
-
 const router = express.Router();
 
 // create Financial Information 
-router.post("/CreateMedical",auth,UpdateMedical)
+router.post("/CreateMedical", auth, UpdateMedical)
 //update Medical Information
-router.post("/UpdateMedical",auth,UpdateMedical)
+router.post("/UpdateMedical", auth, UpdateMedical)
 
-router.get("/GetMedicalData",auth,GetMedicalData)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+router.get("/GetMedicalData", auth, GetMedicalData)
 
 
 

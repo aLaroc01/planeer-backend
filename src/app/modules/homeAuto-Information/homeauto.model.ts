@@ -1,66 +1,66 @@
+import { model, Schema } from "mongoose";
+import {
+  IHomeVehicle,
+  IHomeAutoItem,
+  HomeAutoItemType,
+  POWER_TOYS,
+} from "./homeauto.interface";
 
+const homeAutoItemTypes: HomeAutoItemType[] = [
+  "vehicle",
+  "home",
+  "powerToy",
+];
 
-
-// for mongoose model
-
-import { model, Schema, Types } from 'mongoose'
-
-import { string } from 'zod';
-import { IHomeVehicle } from './homeauto.interface';
-
-
-
-
-const homeautoSchema =  new Schema<IHomeVehicle>({
-     // Vehicle
-    vehicleOwnership: {
+const homeAutoItemSchema = new Schema<IHomeAutoItem>(
+  {
+    itemType: {
       type: String,
-      default: undefined,
+      enum: homeAutoItemTypes,
+      required: true,
     },
-    vehicleMakeModel: {
-      type: String,
-      trim: true,
-      default: undefined,
-    },
-    hasCarInsurance: {
-      type: String,
-      default: undefined,
-    },
-    carInsuranceProvider: {
+    title: {
       type: String,
       trim: true,
-      default: undefined,
+      required: true,
     },
 
-    // ATV / Boat / Motorcycle
-    hasPowerToys: {
-      type: String,
-      default: undefined,
-    },
-    powerToyTypes: {
-      type: String,
-      default: undefined,
-    },
+    vehicleOwnership: { type: String, trim: true },
+    vehicleMakeModel: { type: String, trim: true },
+    hasCarInsurance: { type: String, trim: true },
+    carInsuranceProvider: { type: String, trim: true },
+    carTitle: { type: String, trim: true },
+    carRegisteredIn: { type: String, trim: true },
 
-    // Home
-    homeOccupancy: {
-      type: String,
-      default: undefined,
-    },
-    hasHomeInsurance: {
-      type: String,
-      default: undefined,
-    },
-    homeInsuranceType: {
-      type: String,
-      default: undefined,
-    },
-  
-    homeautoPercentage: { type: Number },
-    userID: { type: Types.ObjectId,   ref: 'User', required: true},
+    homeOccupancy: { type: String, trim: true },
+    homeLocation: { type: String, trim: true },
+    homeInsuranceType: { type: String, trim: true },
 
-    },{
-    timestamps: true, versionKey: false
-})
+    powerToyType: {
+      type: String,
+      enum: POWER_TOYS,
+    },
+  },
+  { timestamps: true }
+);
 
-export const HomeAutoModel = model<IHomeVehicle>("homeauto", homeautoSchema);
+const homeautoSchema = new Schema<IHomeVehicle>(
+  {
+    userID: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      unique: true,
+    },
+    items: {
+      type: [homeAutoItemSchema],
+      default: [],
+    },
+  },
+  { timestamps: true, versionKey: false }
+);
+
+export const HomeAutoModel = model<IHomeVehicle>(
+  "homeauto",
+  homeautoSchema
+);

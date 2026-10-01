@@ -1,5 +1,36 @@
 import { model, Schema } from "mongoose";
-import { IDigitalInfo } from "./digital.interface";
+import {
+  IDigitalInfo,
+  IDigitalItem,
+  DigitalQuestionKey,
+} from "./digital.interface";
+
+const digitalQuestionKeys: DigitalQuestionKey[] = [
+  "digitalMedia",
+  "website",
+  "streamingService",
+];
+
+const digitalItemSchema = new Schema<IDigitalItem>(
+  {
+    questionKey: {
+      type: String,
+      enum: digitalQuestionKeys,
+      required: true,
+    },
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    answer: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+  },
+  { timestamps: true }
+);
 
 const DigitalInfoSchema = new Schema<IDigitalInfo>(
   {
@@ -7,26 +38,17 @@ const DigitalInfoSchema = new Schema<IDigitalInfo>(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      index: true,
+      unique: true,
     },
-    digitalMedia: {
-      type: String,
-      trim: true,
-      default: undefined,
+    items: {
+      type: [digitalItemSchema],
+      default: [],
     },
-    website: {
-      type: String,
-      trim: true,
-      default: undefined,
-    },
-    streamingService: {
-      type: String,
-      trim: true,
-      default: undefined,
-    },
-    digitalInfoPercentage: { type: Number },
   },
   { timestamps: true, versionKey: false }
 );
 
-export const DigitalInfoModel = model<IDigitalInfo>("digitalInfo", DigitalInfoSchema);
+export const DigitalInfoModel = model<IDigitalInfo>(
+  "digitalInfo",
+  DigitalInfoSchema
+);

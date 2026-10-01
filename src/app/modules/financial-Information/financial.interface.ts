@@ -10,10 +10,18 @@ export type FinancialItemType =
 export interface IFinancialItem {
   _id?: Types.ObjectId;
   itemType: FinancialItemType;
+  details?: string;
 
-  // Fields for itemType === "account"
+  // Account or retirement account
   institution?: string;
   accountType?: string;
+
+  // Optional classifications
+  assetType?: string;
+  debtType?: string;
+
+  // Account balance, estimated asset value, or amount owed,
+  // depending on itemType. Never use 0 to mean unanswered.
   amountCents?: number;
 
   createdAt?: Date;

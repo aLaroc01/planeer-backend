@@ -5,12 +5,30 @@ import { MedicalInfoModel } from "../medical-Information/medical.model";
 import { DigitalInfoModel } from "../digital-Information/digital.model";
 import { FinancialModel } from "./financial.model";
 import { Request } from "express";
+import Connection from "../connections/connection.model";
 
 
+export const getFinancialForProxy = async (
+  proxyUserId: string,
+  grantorId: string
+) => {
+  const connection = await Connection.findOne({
+    proxyUserId,
+    grantorId,
+    status: "active",
+    releaseStatus: "released",
+    preauthorizedReleaseEnabled: true,
+    preauthorizedReleaseCategories: "financial",
+  });
 
+  if (!connection) {
+    throw new Error("Financial information is not available to this proxy.");
+  }
 
-
-
+  return FinancialModel.findOne({ userID: grantorId })
+    .select("userID items")
+    .lean();
+};
 
 
 

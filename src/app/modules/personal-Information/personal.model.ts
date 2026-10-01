@@ -1,21 +1,59 @@
+import { model, Schema } from "mongoose";
+import {
+  PERSONAL,
+  IPersonalItem,
+  PersonalQuestionKey,
+} from "./personal.interface";
 
-// for mongoose model
+const personalQuestionKeys: PersonalQuestionKey[] = [
+  "personalItems",
+  "collectables",
+  "personalValues",
+  "specialInstructions",
+  "sentimentalItems",
+];
 
-import { model, Schema, Types } from 'mongoose'
-import { PERSONAL } from './personal.interface';
+const personalItemSchema = new Schema<IPersonalItem>(
+  {
+    questionKey: {
+      type: String,
+      enum: personalQuestionKeys,
+      required: true,
+    },
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    answer: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+  },
+  { timestamps: true }
+);
 
+const personalSchema = new Schema<PERSONAL>(
+  {
+    userID: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      unique: true,
+    },
+    items: {
+      type: [personalItemSchema],
+      default: [],
+    },
+  },
+  {
+    timestamps: true,
+    versionKey: false,
+  }
+);
 
-
-const personalSchema =  new Schema<PERSONAL>({
-    personalItems: { type: String, default: "" },
-    collectables: { type: String, default: "" },
-    personalValues: { type: String, default: "" },
-    specialInstructions: { type: String, default: "" },
-    sentimentalItems: { type: String, default: "" },
-
-    userID: { type: Types.ObjectId,   ref: 'User', required: true},
-    },{
-    timestamps: true,versionKey: false
-})
-
-export const PersonalModel = model<PERSONAL>("personal", personalSchema);
+export const PersonalModel = model<PERSONAL>(
+  "personal",
+  personalSchema
+);
