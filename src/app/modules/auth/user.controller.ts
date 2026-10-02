@@ -60,7 +60,7 @@ export const loginUser = async (req:Request, res:Response, next:NextFunction) =>
 
       
           // 🔹 Success log
-    logSuccess(req, "User logged in successfully", { userId: user._id.toString(), email: user.email });
+    logSuccess(req, "User logged in successful", { userId: user._id.toString(), email: user.email });
 
 
       return res.status(200).json({ success: true, message: "User logged in successfully",statusCode: 200, data: {_id: user._id.toString(),phoneNumber: user.phoneNumber, email: user.email, role: user.role, token: token },
