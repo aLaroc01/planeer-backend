@@ -161,47 +161,48 @@ export const PersonalUpdateService = async (req: Request) => {
   }
 };
 
-export const PersonalGetService = async (req: Request) => {
+export const PersonalGetService = async (
+  req: Request
+) => {
   try {
     const user_id = req.user?.id;
 
     if (!user_id) {
-      return { status: "failed", message: "Unauthorized" };
+      return {
+        status: "failed",
+        message: "Unauthorized",
+      };
     }
-
 
     const personalData = await PersonalModel.findOne(
       { userID: user_id },
       "-createdAt -updatedAt"
     );
 
+    /*
+     * A user who has not saved Personal information yet
+     * is a normal empty state, not an API failure.
+     */
     if (!personalData) {
-      return { status: "failed", message: "No personal data found" };
-    } 
+      return {
+        status: "success",
+        data: {
+          userID: user_id,
+          items: [],
+        },
+      };
+    }
+
     return {
       status: "success",
       data: personalData,
     };
-    // const user_id = req.user?.id;
-
-    // if (!user_id) {
-    //   return { status: "failed", message: "Unauthorized" };
-    // }
-
-    // const personalData = await PersonalModel.findOne(
-    //   { userID: user_id },
-    //   "-createdAt -updatedAt"
-    // );
-
-    // if (!personalData) {
-    //   return { status: "failed", message: "No personal data found" };
-    // }
-
-    // return {
-    //   status: "success",
-    //   data: personalData,
-    // };
   } catch (error: any) {
-    return { status: "failed", message: error.message };
+    return {
+      status: "failed",
+      message:
+        error.message ||
+        "Could not retrieve personal data.",
+    };
   }
 };
