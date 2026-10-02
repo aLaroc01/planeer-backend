@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { MedicalInfoModel } from "./medical.model";
+import { Types } from "mongoose";
 
 
 export const MedicalUpdateService = async (req: Request) => {
@@ -47,49 +48,6 @@ export const MedicalUpdateService = async (req: Request) => {
   }
 };
 
-
-
-
-
-
-
-
-export const calculateMedicalDataCompleteness = async (req: Request, res: Response) => {
-  try {
-    const { healthInsurance, supplementalInsurance, medications, knownAilments } = req.body;
-
-   
-    const allFields = [
-      healthInsurance,
-      supplementalInsurance,
-      medications,
-      knownAilments
-    ];
-    
-  
-    const filledFields = allFields.filter(field => field && field.trim() !== "").length;
-
-    
-    const totalFields = allFields.length;
-    const completenessPercentage = (filledFields / totalFields) * 100;
-
-   
-    return res.status(200).json({
-      status: "success",
-      message: `Data completeness: ${completenessPercentage.toFixed(2)}%`,
-      completenessPercentage: completenessPercentage.toFixed(2), 
-      filledFields, 
-      totalFields,  
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ status: "failed", message: "Server error", data: error });
-  }
-};
-
-
-
-
 export const MedicalGetService = async (req: Request) => {
   try {
 
@@ -117,3 +75,4 @@ export const MedicalGetService = async (req: Request) => {
     return { status: "failed", message: error.message };
   }
 };
+

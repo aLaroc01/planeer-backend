@@ -13,9 +13,21 @@ export type MedicalQuestionKey =
 export interface IMedicalItem {
   _id?: Types.ObjectId;
   questionKey: MedicalQuestionKey;
+
+  // Name of the contact, allergy, medication, condition,
+  // provider, or hospital.
   title: string;
-  answer: string;
+
+  // Optional details or notes.
+  answer?: string;
+
+  // Only used for emergency contacts.
+  phone?: string;
+  relationship?: string;
+
+  // Only used for the preferred hospital.
   hospitalLocation?: string;
+
   createdAt?: Date;
   updatedAt?: Date;
 }

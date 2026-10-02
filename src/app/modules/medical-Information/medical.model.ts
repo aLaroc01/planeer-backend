@@ -22,8 +22,30 @@ const medicalItemSchema = new Schema<IMedicalItem>(
       enum: medicalQuestionKeys,
       required: true,
     },
-    title: { type: String, required: true, trim: true },
-    answer: { type: String, required: true, trim: true },
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    answer: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    phone: {
+      type: String,
+      trim: true,
+      default: undefined,
+    },
+
+    relationship: {
+      type: String,
+      trim: true,
+      default: undefined,
+    },
+
     hospitalLocation: {
       type: String,
       trim: true,
@@ -34,9 +56,23 @@ const medicalItemSchema = new Schema<IMedicalItem>(
 );
 
 medicalItemSchema.pre("validate", function (next) {
-  if (this.questionKey !== "hospital" && this.hospitalLocation) {
+  if (
+    this.questionKey !== "hospital" && 
+    this.hospitalLocation
+  ) {
     return next(
       new Error("hospitalLocation is only allowed for hospital items.")
+    );
+  }
+
+  if (
+    this.questionKey !== "emergencyContact" &&
+    (this.phone || this.relationship)
+  ) {
+    return next(
+      new Error(
+        "Phone and relationship are only allowed for emergency contacts."
+      )
     );
   }
 

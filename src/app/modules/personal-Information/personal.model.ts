@@ -2,37 +2,83 @@ import { model, Schema } from "mongoose";
 import {
   PERSONAL,
   IPersonalItem,
-  PersonalQuestionKey,
+  PersonalItemType,
 } from "./personal.interface";
 
-const personalQuestionKeys: PersonalQuestionKey[] = [
-  "personalItems",
-  "collectables",
-  "personalValues",
-  "specialInstructions",
-  "sentimentalItems",
+const personalItemTypes: PersonalItemType[] = [
+  "valuable",
+  "collectible",
+  "sentimental",
+  "generalInstructions",
 ];
 
 const personalItemSchema = new Schema<IPersonalItem>(
   {
-    questionKey: {
+    itemType: {
       type: String,
-      enum: personalQuestionKeys,
+      enum: personalItemTypes,
       required: true,
     },
-    title: {
+
+    name: {
       type: String,
-      required: true,
       trim: true,
+      default: "",
     },
-    answer: {
+
+    description: {
       type: String,
-      required: true,
       trim: true,
+      default: "",
+    },
+
+    location: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    estimatedValueCents: {
+      type: Number,
+      min: 0,
+      default: undefined,
+      validate: {
+        validator: (value: number | undefined) =>
+          value == null || Number.isSafeInteger(value),
+        message:
+          "Estimated value must be a whole number of cents.",
+      },
+    },
+
+    wishes: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    instructions: {
+      type: String,
+      trim: true,
+      default: "",
     },
   },
   { timestamps: true }
 );
+
+personalItemSchema.pre("validate", function (next) {
+  if (
+    this.itemType !== "generalInstructions" &&
+    !this.name?.trim()
+  ) {
+    return next(
+      new Error(
+        "Each personal item requires a name."
+      )
+    );
+  }
+
+  next();
+});
 
 const personalSchema = new Schema<PERSONAL>(
   {

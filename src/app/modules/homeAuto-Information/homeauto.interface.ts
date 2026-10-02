@@ -1,31 +1,36 @@
 import { Document, Types } from "mongoose";
 import { IUser } from "../auth/user.interface";
 
-export const POWER_TOYS = ["ATV", "Boat", "Motorcycle"] as const;
-export type TPowerToy = (typeof POWER_TOYS)[number];
-
-export type HomeAutoItemType = "vehicle" | "home" | "powerToy";
+export type HomeAutoItemType = "property" | "vehicle";
 
 export interface IHomeAutoItem {
   _id?: Types.ObjectId;
   itemType: HomeAutoItemType;
-  title: string;
 
-  // Vehicle entry
+  // Optional user-friendly identifier.
+  name?: string;
+
+  // Applies to either type.
+  details?: string;
+
+  // Property fields.
+  propertyType?: string;
+  address?: string;
+  propertyOwnership?: string;
+  estimatedValueCents?: number;
+  deedStatus?: string;
+  mortgageStatus?: string;
+  propertyInsurance?: string;
+  otherPropertyInsurance?: string;
+
+  // Vehicle fields.
+  vehicleType?: string;
+  make?: string;
+  model?: string;
+  year?: string;
   vehicleOwnership?: string;
-  vehicleMakeModel?: string;
-  hasCarInsurance?: string;
-  carInsuranceProvider?: string;
-  carTitle?: string;
-  carRegisteredIn?: string;
-
-  // Home entry
-  homeOccupancy?: string;
-  homeLocation?: string;
-  homeInsuranceType?: string;
-
-  // ATV, boat, or motorcycle entry
-  powerToyType?: TPowerToy;
+  titleStatus?: string;
+  vehicleInsurance?: string;
 
   createdAt?: Date;
   updatedAt?: Date;

@@ -1,16 +1,37 @@
 import { Document, Types } from "mongoose";
 import { IUser } from "../auth/user.interface";
 
-export type DigitalQuestionKey =
-  | "digitalMedia"
+export type DigitalItemType =
+  | "subscription"
+  | "emailAccount"
   | "website"
-  | "streamingService";
+  | "digitalAsset";
 
 export interface IDigitalItem {
   _id?: Types.ObjectId;
-  questionKey: DigitalQuestionKey;
-  title: string;
-  answer: string;
+  itemType: DigitalItemType;
+
+  // Subscription, website, or digital-asset name.
+  name?: string;
+
+  // Subscription only.
+  category?: string;
+
+  // Email account, or optional subscription account email.
+  email?: string;
+
+  // Email-account provider only.
+  provider?: string;
+
+  // Website only.
+  url?: string;
+
+  // Other-digital-asset classification.
+  assetType?: string;
+
+  // General optional notes.
+  notes?: string;
+
   createdAt?: Date;
   updatedAt?: Date;
 }
