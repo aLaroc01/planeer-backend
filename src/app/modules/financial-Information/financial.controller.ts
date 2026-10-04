@@ -26,33 +26,38 @@ export const GetFinancialForProxy = async (
   const proxyUserId = req.user?.id?.toString();
   const grantorId = req.params.grantorId;
 
-  if (!proxyUserId) {
-    return res.status(401).json({ message: "Unauthorized access" });
-  }
+  console.log("Financial proxy access check", {
+  proxyUserId: req.user?.id,
+  grantorId: req.params.grantorId,
+});
 
-  if (!grantorId || typeof grantorId !== "string") {
-    return res.status(400).json({ message: "Grantor ID is required" });
-  }
+  // if (!proxyUserId) {
+  //   return res.status(401).json({ message: "Unauthorized access" });
+  // }
 
-  try {
-    const financial = await getFinancialForProxy(proxyUserId, grantorId);
+  // if (!grantorId || typeof grantorId !== "string") {
+  //   return res.status(400).json({ message: "Grantor ID is required" });
+  // }
 
-    if (!financial) {
-      return res.status(404).json({ message: "Financial information not found" });
-    }
+  // try {
+  //   const financial = await getFinancialForProxy(proxyUserId, grantorId);
 
-    return res.status(200).json(financial);
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message === "Financial information is not available to this proxy."
-    ) {
-      return res.status(403).json({ message: error.message });
-    }
+  //   if (!financial) {
+  //     return res.status(404).json({ message: "Financial information not found" });
+  //   }
 
-    console.error("Unable to get proxy financial information:", error);
-    return res.status(500).json({ message: "Unable to load financial information" });
-  }
+  //   return res.status(200).json(financial);
+  // } catch (error) {
+  //   if (
+  //     error instanceof Error &&
+  //     error.message === "Financial information is not available to this proxy."
+  //   ) {
+  //     return res.status(403).json({ message: error.message });
+  //   }
+
+  //   console.error("Unable to get proxy financial information:", error);
+  //   return res.status(500).json({ message: "Unable to load financial information" });
+  // }
 };
 
 
