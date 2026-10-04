@@ -23,9 +23,19 @@ export const getFinancialForProxy = async (
     throw new Error("Financial information is not available to this proxy.");
   }
 
-  return FinancialModel.findOne({ userID: grantorId })
+ const financialData = await FinancialModel.findOne({
+    userID: grantorId,
+  })
     .select("userID items")
     .lean();
+
+  return {
+    status: "success",
+    data: financialData || {
+      userID: grantorId,
+      items: [],
+    },
+  };
 };
 
 
