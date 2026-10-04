@@ -17,9 +17,6 @@ export const getFinancialForProxy = async (
     proxyUserId,
     grantorId,
     status: "active",
-    releaseStatus: "released",
-    preauthorizedReleaseEnabled: true,
-    preauthorizedReleaseCategories: "financial",
   });
 
   if (!connection) {
