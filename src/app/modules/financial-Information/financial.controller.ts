@@ -23,41 +23,36 @@ export const GetFinancialForProxy = async (
   req: Request,
   res: Response
 ) => {
-  const proxyUserId = req.user?.id?.toString();
+  const user_id = req.user?.id;
   const grantorId = req.params.grantorId;
 
-  console.log("Financial proxy access check", {
-  proxyUserId: req.user?.id,
-  grantorId: req.params.grantorId,
-});
+  if (!user_id) {
+    return res.status(401).json({ message: "Unauthorized access" });
+  }
 
-  // if (!proxyUserId) {
-  //   return res.status(401).json({ message: "Unauthorized access" });
-  // }
+  if (!grantorId || typeof grantorId !== "string") {
+    return res.status(400).json({ message: "Grantor ID is required" });
+  }
 
-  // if (!grantorId || typeof grantorId !== "string") {
-  //   return res.status(400).json({ message: "Grantor ID is required" });
-  // }
+  try {
+    const financial = await getFinancialForProxy(user_id, grantorId);
 
-  // try {
-  //   const financial = await getFinancialForProxy(proxyUserId, grantorId);
+    if (!financial) {
+      return res.status(404).json({ message: "Financial information not found" });
+    }
 
-  //   if (!financial) {
-  //     return res.status(404).json({ message: "Financial information not found" });
-  //   }
+    return res.status(200).json(financial);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === "Financial information is not available to this proxy."
+    ) {
+      return res.status(403).json({ message: error.message });
+    }
 
-  //   return res.status(200).json(financial);
-  // } catch (error) {
-  //   if (
-  //     error instanceof Error &&
-  //     error.message === "Financial information is not available to this proxy."
-  //   ) {
-  //     return res.status(403).json({ message: error.message });
-  //   }
-
-  //   console.error("Unable to get proxy financial information:", error);
-  //   return res.status(500).json({ message: "Unable to load financial information" });
-  // }
+    console.error("Unable to get proxy financial information:", error);
+    return res.status(500).json({ message: "Unable to load financial information" });
+  }
 };
 
 
