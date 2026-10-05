@@ -1,6 +1,46 @@
 import { Request } from "express";
 import { Types } from "mongoose";
 import { HomeAutoModel } from "./homeauto.model";
+import {
+  requireActiveProxyConnection,
+} from "../services/proxyAccess.service";
+
+
+export const getHomeAutoForProxy = async (
+  proxyUserId: string,
+  grantorId: string
+) => {
+  const access =
+    await requireActiveProxyConnection({
+      proxyUserId,
+      grantorId,
+    });
+
+  if (!access.ok) {
+    const error = new Error(access.message);
+
+    Object.assign(error, {
+      statusCode: access.statusCode,
+    });
+
+    throw error;
+  }
+
+  const homeAutoData =
+    await HomeAutoModel.findOne({
+      userID: new Types.ObjectId(grantorId),
+    })
+      .select("userID items")
+      .lean();
+
+  return {
+    status: "success",
+    data: homeAutoData || {
+      userID: grantorId,
+      items: [],
+    },
+  };
+};
 
 
 export const HomeAutoService = async (req: Request) => {

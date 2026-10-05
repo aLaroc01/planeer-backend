@@ -1,6 +1,47 @@
 import { PersonalModel } from "./personal.model";
 import { Request } from "express";
 import { Types } from "mongoose";
+import {
+  requireActiveProxyConnection,
+} from "../services/proxyAccess.service";
+
+
+export const getPersonalForProxy = async (
+  proxyUserId: string,
+  grantorId: string
+) => {
+  const access =
+    await requireActiveProxyConnection({
+      proxyUserId,
+      grantorId,
+    });
+
+  if (!access.ok) {
+    const error = new Error(access.message);
+
+    Object.assign(error, {
+      statusCode: access.statusCode,
+    });
+
+    throw error;
+  }
+
+  const personalData =
+    await PersonalModel.findOne({
+      userID: new Types.ObjectId(grantorId),
+    })
+      .select("userID items")
+      .lean();
+
+  return {
+    status: "success",
+    data: personalData || {
+      userID: grantorId,
+      items: [],
+    },
+  };
+};
+
 
 export const PersonalUpdateService = async (req: Request) => {
   try {

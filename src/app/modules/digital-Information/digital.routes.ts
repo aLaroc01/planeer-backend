@@ -4,7 +4,7 @@ import express from "express";
 
 import { auth } from '../../middleware/auth.middleware';
 
-import { GetDigitalData, DigitalInformation } from "./digital.controller";
+import { GetDigitalData, DigitalInformation, GetDigitalForProxy } from "./digital.controller";
 
 
 
@@ -18,6 +18,8 @@ router.post("/CreateDigitalInfo", auth, DigitalInformation)
 router.post("/UpdateDigitalInfo", auth, DigitalInformation)
 
 router.get("/GetDigitalData", auth,GetDigitalData)
+
+router.get("/GetDigitalForProxy/:grantorId", auth, GetDigitalForProxy);
 
 
 

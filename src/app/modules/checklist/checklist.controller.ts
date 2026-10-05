@@ -3,6 +3,61 @@ import mongoose from "mongoose";
 import ChecklistService from "./checklist.service";
 import Connection from "../connections/connection.model";
 import Checklist  from "./checklist.model";
+import { getChecklistForProxy, } from "./checklist.service";
+
+
+export const GetChecklistForProxy = async (
+  req: Request,
+  res: Response
+) => {
+  const proxyUserId =  req.user?.id;
+
+  const grantorId = String(
+    req.params.grantorId || ""
+  ).trim();
+
+  if (!proxyUserId) {
+    return res.status(401).json({
+      status: "failed",
+      message: "Unauthorized access",
+    });
+  }
+
+  if (!grantorId) {
+    return res.status(400).json({
+      status: "failed",
+      message: "Grantor ID is required",
+    });
+  }
+
+  try {
+    const checklist = await getChecklistForProxy(
+      proxyUserId,
+      grantorId
+    );
+
+    return res.status(200).json(checklist);
+  } catch (error: any) {
+    const statusCode =
+      error?.statusCode || 500;
+
+    if (statusCode >= 500) {
+      console.error(
+        "Unable to get proxy checklist information:",
+        error
+      );
+    }
+
+    return res.status(statusCode).json({
+      status: "failed",
+      message:
+        error?.message ||
+        "Unable to load checklist information",
+    });
+  }
+};
+
+
 
 const checklistService = new ChecklistService();
 

@@ -1,7 +1,6 @@
 import express from "express";
-
 import { auth } from './../../middleware/auth.middleware';
-import { GetPersonalData,  UpdatePersonal } from "./personal.controller";
+import { GetPersonalData,  GetPersonalForProxy,  UpdatePersonal } from "./personal.controller";
 
 
 
@@ -17,6 +16,8 @@ router.post("/updatePersonal",auth,UpdatePersonal)
 
 // get personal info
 router.get("/getPersonalData", auth, GetPersonalData)
+
+router.get("/GetPersonalForProxy/:grantorId", auth, GetPersonalForProxy);
 
 
 

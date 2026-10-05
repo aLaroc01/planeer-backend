@@ -3,7 +3,7 @@ import express from "express";
 
 import { auth } from './../../middleware/auth.middleware';
 
-import { GetHomeautoData, HomeAutoUpdate } from "./homeauto.controller";
+import { GetHomeautoData, GetHomeAutoForProxy, HomeAutoUpdate } from "./homeauto.controller";
 
 
 
@@ -20,6 +20,8 @@ router.post("/UpdateHomeAuto", auth, HomeAutoUpdate);
 
 //get Financial Information
 router.get("/GetHomeautoData", auth, GetHomeautoData);
+
+router.get("/GetHomeAutoForProxy/:grantorId", auth, GetHomeAutoForProxy);
 
 
 

@@ -1,6 +1,45 @@
 import { Request, Response } from "express";
 import { MedicalInfoModel } from "./medical.model";
 import { Types } from "mongoose";
+import {
+  requireActiveProxyConnection,
+} from "../services/proxyAccess.service";
+
+
+export const getMedicalForProxy = async (
+  proxyUserId: string,
+  grantorId: string
+) => {
+  const access =
+    await requireActiveProxyConnection({
+      proxyUserId,
+      grantorId,
+    });
+
+  if (!access.ok) {
+    const error = new Error(access.message);
+
+    Object.assign(error, {
+      statusCode: access.statusCode,
+    });
+
+    throw error;
+  }
+
+  const medicalData = await MedicalInfoModel.findOne({
+    userID: new Types.ObjectId(grantorId),
+  })
+    .select("userID items")
+    .lean();
+
+  return {
+    status: "success",
+    data: medicalData || {
+      userID: grantorId,
+      items: [],
+    },
+  };
+};
 
 
 export const MedicalUpdateService = async (req: Request) => {
