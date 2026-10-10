@@ -8,7 +8,9 @@ import {
   handleSubscriptionDeleted, 
   saveSubscriptionToDB,
   saveSubscriptionToDBFromPaymentLink,
-  SubscriptionService} from "./subscriptions.service";
+  SubscriptionService,
+  syncSubscriptionById,
+} from "./subscriptions.service";
 import AppError from "../../../errors/AppError";
 import { StatusCodes } from "http-status-codes";
 import Stripe from "stripe";
@@ -284,6 +286,16 @@ export const stripeWebhookHandler = catchAsync( async (req, res) => {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
 
+        if (session.mode !== "subscription") {
+          responseData = {
+            statusCode: StatusCodes.OK,
+            success: true,
+            message: "Non-subscription Checkout Session ignored",
+            data: null,
+          };
+          break;
+        }
+
         const subscription =
           await SubscriptionService.saveSubscriptionToDBFromPaymentLink(session);
 
@@ -295,24 +307,32 @@ export const stripeWebhookHandler = catchAsync( async (req, res) => {
         };
         break;
       }
-
+      case "invoice.paid": {
+        responseData = await SubscriptionService.handleInvoicePaid(
+          event.data.object as Stripe.Invoice,
+        );
+        break;
+      }
       case "customer.subscription.created":
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
-        const stripeSubscription = event.data.object as Stripe.Subscription;
+        const eventSubscription =
+          event.data.object as Stripe.Subscription;
 
         const subscription =
-          await SubscriptionService.syncSubscriptionFromStripe(stripeSubscription);
+          await SubscriptionService.syncSubscriptionById(
+            eventSubscription.id,
+          );
 
         responseData = {
           statusCode: StatusCodes.OK,
           success: true,
-          message: `Subscription ${stripeSubscription.status} synchronized`,
+          message: "Subscription state synchronized",
           data: subscription,
         };
+
         break;
       }
-
       case "invoice.payment_failed": {
         responseData = await SubscriptionService.handlePaymentFailed(
           event.data.object as Stripe.Invoice,

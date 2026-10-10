@@ -7,13 +7,15 @@ import {
   deleteChecklist,
 } from "./checklist.controller";
 import { auth } from './../../middleware/auth.middleware';
+import { requireEntitledGrantor } from './../../middleware/requireEntitledGrantor';
+
 
 const router = express.Router();
 
-router.post("/createChecklist", auth, createChecklist);
-router.get("/getChecklist", auth, getChecklistByCurrentUser);
-router.patch("/checklistUpdate", auth, updateChecklist);
-router.delete("/checklistDelete", auth, deleteChecklist);
+router.post("/createChecklist", auth, requireEntitledGrantor, createChecklist);
+router.get("/getChecklist", auth, requireEntitledGrantor, getChecklistByCurrentUser);
+router.patch("/checklistUpdate", auth, requireEntitledGrantor, updateChecklist);
+router.delete("/checklistDelete", auth, requireEntitledGrantor, deleteChecklist);
 router.get("/GetChecklistForProxy/:grantorId", auth, GetChecklistForProxy);
 
 export const ChecklistRoutes = router;

@@ -4,6 +4,22 @@ import { Model, Types } from 'mongoose';
 
 export type ISubscription = {
      customerId: string;
+     stripeStatus?:
+     | "incomplete"
+     | "incomplete_expired"
+     | "trialing"
+     | "active"
+     | "past_due"
+     | "canceled"
+     | "unpaid"
+     | "paused"
+     | null;
+
+     cancelAtPeriodEnd?: boolean;
+     paymentCollectionPaused?: boolean;
+     trialEnd?: Date | null;
+     canceledAt?: Date | null;
+     currency?: string;
      price: number;
      userId: Types.ObjectId;
      package: Types.ObjectId;

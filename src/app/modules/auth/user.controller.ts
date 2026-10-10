@@ -1,9 +1,10 @@
 import { NextFunction, Request, Response } from "express";
 import { adminDeleteUserService, adminEmailService, adminLoginService, adminUpdateUserService, codeVerification,  existingUser,  
-   getAllOwnUserDataService,   
-   getAllUserDataService,  getallUsers, getCountsService, getNewUsersLast10DaysService, getprofileService, getProxysetData, getUsersWhoAddedMeAsProxyService,
-   getUsersWhoSetMyProxyService,LoginInUser,  ProxysetService, searchUsersService,  updatePassword, updateUserService, UserAnalysisService, userSelfUpdateService } from "./user.service";
-import { ProxyUser } from "./user.interface";
+   getAllOwnUserDataService, getAllUserDataService,  getallUsers, getCountsService, getNewUsersLast10DaysService, getprofileService, 
+   getProxysetData, getUsersWhoAddedMeAsProxyService, getUsersWhoSetMyProxyService,LoginInUser,  ProxysetService, searchUsersService,  
+   updatePassword, updateUserService, UserAnalysisService, userSelfUpdateService, } from "./user.service";
+import { PlanStatus } from "./user.interface";
+import { checkActiveSubscription } from "../subscriptions-information/subscriptions.service";
 import { User } from "./user.model";
 import { logSuccess } from "../../../helpers/successLogger";
 import logger from "../../../helpers/logger";
@@ -13,6 +14,8 @@ import { getErrorCount, incrementErrorCount } from "../../../helpers/errorCounte
  import bcrypt from "bcryptjs";
 
 
+
+// User registration controller
 export const registerUser = async (
   req: Request,
   res: Response,
@@ -47,7 +50,7 @@ export const registerUser = async (
 
 
 
-
+// User login controller
 export const loginUser = async (req:Request, res:Response, next:NextFunction) => {
     try{
         const { email, password } = req.body;
@@ -74,14 +77,77 @@ export const loginUser = async (req:Request, res:Response, next:NextFunction) =>
 }   
 
 
+// Get the account status of the currently logged-in user
+export const getAccountStatus = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const userId = req.user?._id;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+      return;
+    }
+
+    const user = await User.findById(userId)
+      .select(
+        "role accountStatus planStatus " +
+        "planStatusChangedAt archiveExpiresAt"
+      )
+      .lean();
+
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+      return;
+    }
+
+    const planStatus =
+      user.planStatus ?? PlanStatus.ACTIVE;
+
+    const subscriptionActive =
+      await checkActiveSubscription(userId);
+
+    const planRestricted =
+      planStatus === PlanStatus.FROZEN ||
+      planStatus === PlanStatus.ARCHIVED;
+
+    res.status(200).json({
+      success: true,
+      message: "Account status retrieved.",
+      data: {
+        role: user.role,
+
+        // Administrative/verification status:
+        accountStatus: user.accountStatus,
+
+        // Grantor plan lifecycle:
+        planStatus,
+        planRestricted,
+        planStatusChangedAt:
+          user.planStatusChangedAt ?? null,
+        archiveExpiresAt:
+          user.archiveExpiresAt ?? null,
+
+        // Eligibility, not yet a role-based restriction:
+        subscriptionActive,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
 
 
 
-
-
-
-
-
+// Get the profile data of the currently logged-in user
 export const GetProfileData=async (req:Request,res:Response,next:NextFunction) => {
   
     let result = await getprofileService(req);
@@ -92,6 +158,7 @@ export const GetProfileData=async (req:Request,res:Response,next:NextFunction) =
 }
 
 
+// User updates their own profile
 export const userSelfUpdate = async (
   req: Request,
   res: Response
@@ -108,6 +175,7 @@ export const userSelfUpdate = async (
 };
 
 
+// Admin deletes a user by ID
 export const adminDeleteUser = async (
   req: Request,
   res: Response
@@ -126,16 +194,7 @@ export const adminDeleteUser = async (
 
 
 
-
-
-
-
-
-
-
-
-
-
+// Get the profile data of all users
 export const GetAllProfile=async (req:Request,res:Response) => {
   
     let result = await getallUsers();
@@ -144,7 +203,7 @@ export const GetAllProfile=async (req:Request,res:Response) => {
 }
 
 
-
+// Admin updates a user's profile
 export const searchUsersController = async (req: Request, res: Response, next: NextFunction) => {
   const searchTerm = req.query.searchTerm as string;
 
@@ -175,13 +234,7 @@ export const searchUsersController = async (req: Request, res: Response, next: N
 
 
 
-
-
-
-
-
-
-
+// Admin sets a proxy for a user
 export const ProxysetController = async (req: Request, res: Response) => {
   const result = await ProxysetService(req);
   logSuccess(req, "Proxy set fetched successfully");
@@ -197,6 +250,7 @@ export const ProxysetController = async (req: Request, res: Response) => {
 //   return res.json(result);
 // };
 
+// Admin retrieves all proxy settings for a user
 export const getAllProxysetController = async (req: Request, res: Response) => {
   // ✅ Convert id safely
   const idStr = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
@@ -315,7 +369,7 @@ export const AdminEmail = async (req: Request, res: Response, next: NextFunction
 
 
 
-
+// User verifies an OTP code
 export const codeverify = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, otp } = req.body;
@@ -340,6 +394,7 @@ export const codeverify = async (req: Request, res: Response, next: NextFunction
 
 
 
+// User resets their password
 export const forgetPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, otp, password } = req.body;
@@ -370,7 +425,7 @@ export const forgetPassword = async (req: Request, res: Response, next: NextFunc
 
 
 
-
+// Admin retrieves a list of users with pagination and search functionality
 export const UserList = async (req: Request, res: Response): Promise<void> => {
   try {
     const pageNo = Number(req.query.pageNo) || 1;
@@ -438,7 +493,7 @@ export const UserList = async (req: Request, res: Response): Promise<void> => {
 
 
 
-
+// Get the count of new users in the last 10 days
 export const getNewUsersLast10Days = async (req: Request, res: Response) => {
   try {
     const newUserCount = await getNewUsersLast10DaysService();
@@ -461,12 +516,12 @@ export const getNewUsersLast10Days = async (req: Request, res: Response) => {
 
 
 
-
-    export const updateUserController = async (req:Request,res:Response) => {
+// Admin updates a user's profile
+  export const updateUserController = async (req:Request,res:Response) => {
     let result = await updateUserService(req);
     res.json(result);
 
-    }
+  }
 
 
     
@@ -474,7 +529,7 @@ export const getNewUsersLast10Days = async (req: Request, res: Response) => {
 
 
 
-
+// Get various counts related to users and other entities
 export const getCounts = async (req: Request, res: Response): Promise<void> => {
   try {
     const result = await getCountsService(req);
@@ -497,7 +552,7 @@ export const getCounts = async (req: Request, res: Response): Promise<void> => {
 
 
 
-
+// User analysis controller
 export class UserAnalysisController {
   static async getAnalysis(req: Request, res: Response) {
     try {
@@ -549,6 +604,7 @@ export class UserAnalysisController {
 //   }
 // };
 
+// Get all data for the logged-in user
 export const getAllOwnUserDataController = async (req: Request, res: Response) => {
   try {
     // ✅ Handle string | string[] safely
@@ -575,25 +631,7 @@ export const getAllOwnUserDataController = async (req: Request, res: Response) =
 };
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+// Get all data for a specific user by admin
 export const getAllUserDataController = async (
   req: Request,
   res: Response
@@ -682,7 +720,7 @@ export const getAllUserDataController = async (
 // };
 
 
-
+// Get users who added the logged-in user as a proxy
 export const getUsersWhoAddedMeAsProxyController = async (
   req: Request,
   res: Response
@@ -716,6 +754,7 @@ export const getUsersWhoAddedMeAsProxyController = async (
 
 
 
+// Get users for whom the logged-in user has set as a proxy
 export const getUsersWhoSetMyProxy = async (
   req: Request,
   res: Response
@@ -756,7 +795,7 @@ export const getUsersWhoSetMyProxy = async (
   }
 };
 
-
+// Admin login controller
 export const adminLoginController = async (
   req: Request,
   res: Response,
@@ -799,7 +838,7 @@ export const adminLoginController = async (
 
 
 
-
+// Get system performance metrics
 export const getSystemPerformance = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const memoryUsage = process.memoryUsage(); // memory info
@@ -856,7 +895,7 @@ export const getSystemPerformance = async (req: Request, res: Response, next: Ne
 
 
 
-
+// Admin updates a user's profile
 export const adminUpdateUser = async (
   req: Request,
   res: Response

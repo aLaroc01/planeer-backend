@@ -5,29 +5,42 @@ import { MedicalInfoModel } from "../medical-Information/medical.model";
 import { DigitalInfoModel } from "../digital-Information/digital.model";
 import { FinancialModel } from "./financial.model";
 import { Request } from "express";
-import Connection from "../connections/connection.model";
 import { Types } from "mongoose";
+import {
+  requireActiveProxyConnection,
+} from "../services/proxyAccess.service";
 
 
 export const getFinancialForProxy = async (
   proxyUserId: string,
   grantorId: string
 ) => {
-  const connection = await Connection.findOne({
-    proxyUserId,
-    grantorId,
-    status: "active",
-  });
+  const access =
+    await requireActiveProxyConnection({
+      proxyUserId,
+      grantorId,
+    });
 
-  if (!connection) {
-    throw new Error("Financial information is not available to this proxy.");
+  if (!access.ok) {
+    const error = new Error(access.message);
+
+    /*
+     * Lets your controller map this to the appropriate
+     * HTTP status without losing the authorization result.
+     */
+    Object.assign(error, {
+      statusCode: access.statusCode,
+    });
+
+    throw error;
   }
 
- const financialData = await FinancialModel.findOne({
-    userID: grantorId,
-  })
-    .select("userID items")
-    .lean();
+  const financialData =
+    await FinancialModel.findOne({
+      userID: new Types.ObjectId(grantorId),
+    })
+      .select("userID items")
+      .lean();
 
   return {
     status: "success",

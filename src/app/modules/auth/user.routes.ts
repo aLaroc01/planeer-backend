@@ -1,5 +1,10 @@
 import express from "express";
-import { adminDeleteUser, AdminEmail, adminLoginController, adminUpdateUser, codeverify, forgetPassword,  getAllOwnUserDataController,  GetAllProfile, getAllProxysetController, getAllUserDataController, getCounts, getNewUsersLast10Days, GetProfileData, getSystemPerformance, getUsersWhoAddedMeAsProxyController, getUsersWhoSetMyProxy, loginUser,  ProxysetController, registerUser, searchUsersController, updateUserController, UserAnalysisController, UserList, userSelfUpdate,  } from "./user.controller";
+import { adminDeleteUser, AdminEmail, adminLoginController, adminUpdateUser, 
+    codeverify, forgetPassword,  getAllOwnUserDataController,  GetAllProfile, 
+    getAllProxysetController, getAllUserDataController, getCounts, getNewUsersLast10Days, 
+    GetProfileData, getSystemPerformance, getUsersWhoAddedMeAsProxyController, getUsersWhoSetMyProxy, 
+    loginUser,  ProxysetController, registerUser, searchUsersController, updateUserController, 
+    UserAnalysisController, UserList, userSelfUpdate, getAccountStatus } from "./user.controller";
 import { auth, isAdmin } from './../../middleware/auth.middleware';
 
 
@@ -26,6 +31,9 @@ router.get("/GetAllProfile",auth,GetAllProfile)
 // GET request route for search
 router.get("/search", auth, searchUsersController);
 
+// get account status
+router.get("/account-status", auth, getAccountStatus);
+
 // router.get("/alldata-percentage/:userId",auth, alldatapercentage);
 
 
@@ -47,8 +55,6 @@ router.get("/alluser-data", auth, getAllOwnUserDataController);
 //all proxyset set user
 router.get("/alluser-set-data",auth, getUsersWhoAddedMeAsProxyController);
 
-
-
 // GET /api/users/my-proxy-users?userId=...
 router.get("/my-proxy-users",auth, getUsersWhoSetMyProxy);
 
@@ -58,15 +64,7 @@ router.get("/my-proxy-users",auth, getUsersWhoSetMyProxy);
 
 
 
-
-
-
-
-
-
-
-//admin routes
-
+// ADMIN ROUTES
 // admin Registration 
 router.post("/adminregister",registerUser)
 

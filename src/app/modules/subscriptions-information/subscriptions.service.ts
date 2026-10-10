@@ -49,31 +49,68 @@ const asCustomerId = (
   return typeof customer === "string" ? customer : customer.id;
 };
 
-const getSubscriptionUserId = (
-    subscription: Stripe.Subscription,
-    sessionUserId?: string | null,
-  ) => {
-    const userId =
-      sessionUserId ??
-      subscription.metadata?.userId ??
-      subscription.metadata?.user_id ??
-      null;
+const getSubscriptionUserId = async (
+  subscription: Stripe.Subscription,
+  sessionUserId?: string | null,
+): Promise<string> => {
+  // Use an existing subscription association first.
+  // Do not reassign an already linked subscription.
+  const existingSubscription = await Subscription.findOne({
+    stripeSubscriptionId: subscription.id,
+  })
+    .select("userId")
+    .lean();
 
-    console.log("Resolving subscription user ID:", {
-      sessionUserId,
-      subscriptionMetadata: subscription.metadata,
-      resolvedUserId: userId,
-    });
+  if (existingSubscription?.userId) {
+    return String(existingSubscription.userId);
+  }
 
-    if (!userId || !Types.ObjectId.isValid(userId)) {
-      throw new AppError(
-        StatusCodes.BAD_REQUEST,
-        "Stripe subscription is missing a valid user ID.",
-      );
+  const metadataUserId =
+    subscription.metadata?.userId ??
+    subscription.metadata?.user_id ??
+    null;
+
+  // Prefer an existing Stripe customer association over
+  // a Checkout client_reference_id.
+  const customerId = asCustomerId(subscription.customer);
+
+  if (customerId) {
+    const linkedUser = await User.findOne({
+      stripeCustomerId: customerId,
+    })
+      .select("_id")
+      .lean();
+
+    if (linkedUser) {
+      return String(linkedUser._id);
     }
+  }
 
-    return userId;
-  };
+  const candidateId = metadataUserId ?? sessionUserId;
+
+  if (
+    !candidateId ||
+    !Types.ObjectId.isValid(candidateId)
+  ) {
+    throw new AppError(
+      StatusCodes.BAD_REQUEST,
+      "Stripe subscription could not be linked to a Planeer user.",
+    );
+  }
+
+  const userExists = await User.exists({
+    _id: candidateId,
+  });
+
+  if (!userExists) {
+    throw new AppError(
+      StatusCodes.NOT_FOUND,
+      "The user associated with this subscription was not found.",
+    );
+  }
+
+  return candidateId;
+};
 
 const getPackageId = async (
     subscription: Stripe.Subscription,
@@ -165,12 +202,22 @@ const mapStripeSubscriptionStatus = (
   }
 };
 
+export const syncSubscriptionById = async (
+  subscriptionId: string,
+) => {
+  const currentSubscription =
+    await stripe.subscriptions.retrieve(subscriptionId);
 
+  return syncSubscriptionFromStripe(currentSubscription);
+};
+
+
+// Synchronize a Stripe subscription with the local database. 
 export const syncSubscriptionFromStripe = async (
   stripeSubscription: Stripe.Subscription,
   sessionUserId?: string | null,
 ) => {
-  const userId = getSubscriptionUserId(stripeSubscription, sessionUserId);
+  const userId = await getSubscriptionUserId(stripeSubscription, sessionUserId,);
   const packageId = await getPackageId(stripeSubscription);
   const stripeCustomerId = asCustomerId(stripeSubscription.customer);
 
@@ -207,12 +254,27 @@ export const syncSubscriptionFromStripe = async (
   const subscriptionData = {
     customerId: stripeCustomerId,
     price: getPriceAmount(stripeSubscription),
+    currency: getCurrency(stripeSubscription),
+
     userId: new Types.ObjectId(userId),
     package: new Types.ObjectId(packageId),
+
     currentPeriodStart,
     currentPeriodEnd,
     remaining,
-    status: mapStripeSubscriptionStatus(stripeSubscription.status),
+
+    // Preserve existing local status for compatibility.
+    status: mapStripeSubscriptionStatus(
+      stripeSubscription.status
+    ),
+
+    // Preserve the actual Stripe lifecycle state.
+    stripeStatus: stripeSubscription.status,
+    cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
+    paymentCollectionPaused: Boolean(stripeSubscription.pause_collection),
+
+    trialEnd: toDate(stripeSubscription.trial_end),
+    canceledAt: toDate(stripeSubscription.canceled_at),
   };
 
   const dbSubscription = await Subscription.findOneAndUpdate(
@@ -231,29 +293,44 @@ export const syncSubscriptionFromStripe = async (
   );
 
   const hasEntitledSubscription = await Subscription.exists({
-  userId: new Types.ObjectId(userId),
-  status: { $in: [...ENTITLED_SUBSCRIPTION_STATUSES] },
-});
+    userId: new Types.ObjectId(userId),
+    stripeStatus: {
+      $in: [...ENTITLED_SUBSCRIPTION_STATUSES],
+    },
+    currentPeriodEnd: { $gt: new Date() },                         
+  });
 
-const userUpdate: Record<string, unknown> = {
-  stripeCustomerId,
-  isSubscribed: Boolean(hasEntitledSubscription),
-};
-
-  // A user consumes the free trial once Stripe creates a trialing subscription.
-  // This is intentionally never reset if they later cancel.
-  if (stripeSubscription.status === "trialing") {
-    userUpdate.hasUsedFreeTrial = true;
-    userUpdate.freeTrialUsedAt = new Date();
-  }
+  const userUpdate: Record<string, unknown> = {
+    stripeCustomerId,
+    isSubscribed: Boolean(hasEntitledSubscription),
+  };
 
   await User.findByIdAndUpdate(userId, {
     $set: userUpdate,
   });
 
+  if (stripeSubscription.status === "trialing") {
+    await User.updateOne(
+      {
+        _id: userId,
+        hasUsedFreeTrial: { $ne: true },
+      },
+      {
+        $set: {
+          hasUsedFreeTrial: true,
+          freeTrialUsedAt:
+            toDate(stripeSubscription.trial_start) ??
+            new Date(),
+        },
+      },
+    );
+  }
+
   return dbSubscription;
 };
 
+
+// Create a new subscription checkout session for the user.
 export const createSubscriptionCheckoutSession = async (
   userId: string,
   packageId: string,
@@ -289,7 +366,10 @@ export const createSubscriptionCheckoutSession = async (
 
   const openSubscription = await Subscription.findOne({
     userId: user._id,
-    status: { $in: [...OPEN_SUBSCRIPTION_STATUSES] },
+
+    stripeStatus: {
+      $in: [...OPEN_SUBSCRIPTION_STATUSES],
+    },
   }).sort({ createdAt: -1 });
 
   if (openSubscription) {
@@ -362,6 +442,48 @@ export const createSubscriptionCheckoutSession = async (
   };
 };
 
+
+// Handle the event when an invoice is paid in Stripe. 
+// This function synchronizes the subscription associated with the paid invoice.
+export const handleInvoicePaid = async (
+  invoice: Stripe.Invoice,
+) => {
+  const subscriptionReference =
+    invoice.parent?.subscription_details?.subscription;
+
+  if (!subscriptionReference) {
+    return {
+      success: true,
+      message: "Invoice is not associated with a subscription.",
+      data: null,
+      statusCode: StatusCodes.OK,
+    };
+  }
+
+  const subscriptionId =
+    typeof subscriptionReference === "string"
+      ? subscriptionReference
+      : subscriptionReference.id;
+
+  const stripeSubscription =
+    await stripe.subscriptions.retrieve(subscriptionId);
+
+  const subscription =
+    await syncSubscriptionFromStripe(stripeSubscription);
+
+  return {
+    success: true,
+    message: "Paid invoice subscription synchronized.",
+    data: {
+      subscriptionId: subscription.stripeSubscriptionId,
+      userId: subscription.userId,
+    },
+    statusCode: StatusCodes.OK,
+  };
+};
+
+
+// Save the subscription to the database after a successful checkout session.
 export const saveSubscriptionToDB = async (sessionId: string) => {
   const session = await stripe.checkout.sessions.retrieve(sessionId);
 
@@ -394,6 +516,8 @@ export const saveSubscriptionToDB = async (sessionId: string) => {
   );
 };
 
+
+// Save the subscription to the database after a successful payment link session.
 export const saveSubscriptionToDBFromPaymentLink = async (
   session: Stripe.Checkout.Session,
 ) => {
@@ -419,6 +543,9 @@ export const saveSubscriptionToDBFromPaymentLink = async (
   );
 };
 
+
+// Handle the event when a subscription is deleted in Stripe. 
+// This function synchronizes the subscription cancellation.
 export const handleSubscriptionDeleted = async (
   stripeSubscription: Stripe.Subscription,
 ) => {
@@ -435,6 +562,7 @@ export const handleSubscriptionDeleted = async (
   };
 };
 
+// Handle the event when a subscription payment fails in Stripe.
 export const handlePaymentFailed = async (invoice: Stripe.Invoice) => {
   const subscriptionId =
     invoice.parent?.subscription_details?.subscription;
@@ -467,6 +595,7 @@ export const handlePaymentFailed = async (invoice: Stripe.Invoice) => {
   };
 };
 
+// Create a billing portal session for the user to manage their subscription.
 export const createBillingPortalSession = async (userId: string) => {
   const user = await User.findById(userId).select("+stripeCustomerId");
 
@@ -1326,8 +1455,10 @@ export const SubscriptionService = {
   syncSubscriptionFromStripe,
   handleSubscriptionDeleted,
   handlePaymentFailed,
+  handleInvoicePaid,
 
   createBillingPortalSession,
   checkActiveSubscription,
+  syncSubscriptionById,
 };
 

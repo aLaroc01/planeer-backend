@@ -7,6 +7,13 @@ export enum Role {
   SUPER_ADMIN = "SUPER_ADMIN",
 }
 
+export enum PlanStatus {
+  ACTIVE = "ACTIVE",
+  FROZEN = "FROZEN",
+  ARCHIVED = "ARCHIVED",
+}
+
+
 export enum AccountStatus {
   ACTIVE = "ACTIVE",
   SUSPENDED = "SUSPENDED",
@@ -31,6 +38,12 @@ export interface IUser extends Document {
   role: Role;
 
   accountStatus: AccountStatus;
+  planStatus?: PlanStatus;
+  planStatusChangedAt?: Date | null;
+  planStatusChangedBy?: Types.ObjectId | null;
+
+  archiveExpiresAt?: Date | null;
+
   lastLoginAt?: Date | null;
 
   mfa: {

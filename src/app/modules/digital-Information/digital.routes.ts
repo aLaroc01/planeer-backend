@@ -5,6 +5,7 @@ import express from "express";
 import { auth } from '../../middleware/auth.middleware';
 
 import { GetDigitalData, DigitalInformation, GetDigitalForProxy } from "./digital.controller";
+import { requireEntitledGrantor } from '../../middleware/requireEntitledGrantor';
 
 
 
@@ -13,28 +14,13 @@ import { GetDigitalData, DigitalInformation, GetDigitalForProxy } from "./digita
 const router = express.Router();
 
 // create Financial Information 
-router.post("/CreateDigitalInfo", auth, DigitalInformation)
+router.post("/CreateDigitalInfo", auth, requireEntitledGrantor, DigitalInformation)
 
-router.post("/UpdateDigitalInfo", auth, DigitalInformation)
+router.post("/UpdateDigitalInfo", auth, requireEntitledGrantor, DigitalInformation)
 
-router.get("/GetDigitalData", auth,GetDigitalData)
+router.get("/GetDigitalData", auth, requireEntitledGrantor, GetDigitalData)
 
 router.get("/GetDigitalForProxy/:grantorId", auth, GetDigitalForProxy);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
