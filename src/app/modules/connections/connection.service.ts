@@ -7,7 +7,6 @@ import { sendProxyInviteEmail } from "./sendProxyInviteEmail";
 import { SendEmail } from "../../../helpers/emailHelper";
 import Checklist from "../checklist/checklist.model";
 import mongoose from "mongoose";
-import { ArchiveRequest } from "../archive-request/archive-request.model";
 
 /**
  * Helper: normalize email from body
@@ -831,45 +830,6 @@ export const updateConnectionPreauthorizedReleaseService = async (req: Request) 
     };
   }
 }
-
-
-export const getMyGrantorArchiveRequestService = async (
-  connectionId: string,
-  requesterId: string,
-) => {
-  const connection = await Connection.findOne({
-    _id: connectionId,
-    proxyUserId: requesterId,
-    status: "active",
-  })
-    .select("_id grantorId")
-    .lean()
-    .exec() as { _id: unknown; grantorId: string } | null;
-
-  if (!connection) {
-    return {
-      connectionFound: false,
-      archiveRequest: null,
-    };
-  }
-
-  const archiveRequest = await ArchiveRequest.findOne({
-    connectionId: connectionId,
-    grantorId: connection.grantorId,
-    requestedBy: requesterId,
-  })
-    .select(
-      "_id connectionId grantorId reason status " +
-      "requesterNote createdAt reviewedAt",
-    )
-    .sort({ createdAt: -1, _id: -1 })
-    .lean();
-
-  return {
-    connectionFound: true,
-    archiveRequest: archiveRequest ?? null,
-  };
-};
 
 
 /**

@@ -754,7 +754,10 @@ export const getMyGrantorArchiveRequest = async (
       status: "active",
     })
       .select("_id grantorId")
-      .lean();
+      .lean<{
+        _id: mongoose.Types.ObjectId;
+        grantorId: mongoose.Types.ObjectId;
+      } | null>();
 
     if (!connection) {
       return res.status(404).json({
