@@ -1,5 +1,5 @@
 import { model, Schema, Types } from "mongoose";
-import { IUser, Role, AccountStatus } from "../auth/user.interface";
+import { IUser, Role, AccountStatus, PlanStatus } from "../auth/user.interface";
 
 const userSchema = new Schema<IUser>(
   {
@@ -30,6 +30,29 @@ const userSchema = new Schema<IUser>(
       enum: Object.values(AccountStatus),
       default: AccountStatus.PENDING_VERIFICATION,
       index: true,
+    },
+
+    planStatus: {
+      type: String,
+      enum: Object.values(PlanStatus),
+      default: PlanStatus.ACTIVE,
+      index: true,
+    },
+
+    planStatusChangedAt: {
+      type: Date,
+      default: null,
+    },
+
+    planStatusChangedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
+    archiveExpiresAt: {
+      type: Date,
+      default: null,
     },
 
     // New: set after a successful login
@@ -83,7 +106,16 @@ const userSchema = new Schema<IUser>(
   {
     timestamps: true,
     versionKey: false,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
+
+userSchema.virtual("profile", {
+  ref: "profile",
+  localField: "_id",
+  foreignField: "userID",
+  justOne: true,
+});
 
 export const User = model<IUser>("User", userSchema);

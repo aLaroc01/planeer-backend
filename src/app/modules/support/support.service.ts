@@ -53,15 +53,23 @@ const getAllTickets = async (
   status?: "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED"
 ) => {
   const populateFields = [
-    {
-      path: "userId",
-      select: "firstName lastName email imgUrl",
+  {
+    path: "userId",
+    select: "email imgUrl profile",
+    populate: {
+      path: "profile",
+      select: "firstName lastName imgUrl",
     },
-    {
-      path: "updatedBy",
-      select: "firstName lastName email imgUrl",
+  },
+  {
+    path: "updatedBy",
+    select: "email imgUrl profile",
+    populate: {
+      path: "profile",
+      select: "firstName lastName imgUrl",
     },
-  ];
+  },
+];
 
   // If the dashboard filters by a specific status,
   // return only that status, newest updates first.
