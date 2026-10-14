@@ -9,7 +9,9 @@ type CreateTicketPayload = {
 
 export type UpdateTicketPayload = {
   status?: "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
+  priority?: "LOW" | "NORMAL" | "HIGH";
   adminReply?: string;
+  internalNotes?: string;
 };
 
 const createTicket = async (
