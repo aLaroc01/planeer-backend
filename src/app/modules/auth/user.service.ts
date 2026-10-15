@@ -1168,7 +1168,7 @@ export const adminUpdateUserService = async (req: Request) => {
         runValidators: true,
       }
     ).select(
-      "_id email phoneNumber role accountStatus lastLoginAt mfa.enabled createdAt updatedAt"
+      "_id email phoneNumber role accountStatus planStatus lastLoginAt mfa.enabled createdAt updatedAt"
     );
 
     if (!updatedUser) {

@@ -9,6 +9,7 @@ export enum Role {
 
 export enum PlanStatus {
   ACTIVE = "ACTIVE",
+  TRIALING = "TRIALING",
   FROZEN = "FROZEN",
   ARCHIVED = "ARCHIVED",
 }

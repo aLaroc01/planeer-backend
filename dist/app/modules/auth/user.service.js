@@ -983,7 +983,7 @@ const adminUpdateUserService = async (req) => {
         const updatedUser = await user_model_1.User.findByIdAndUpdate(userId, { $set: updates }, {
             new: true,
             runValidators: true,
-        }).select("_id email phoneNumber role accountStatus lastLoginAt mfa.enabled createdAt updatedAt");
+        }).select("_id email phoneNumber role accountStatus planStatus lastLoginAt mfa.enabled createdAt updatedAt");
         if (!updatedUser) {
             return {
                 status: "failed",
