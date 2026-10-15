@@ -721,6 +721,10 @@ export const reviewGrantorArchiveRequest = async (
   }
 };
 
+const isValidObjectId = (value: unknown): value is string =>
+  typeof value === "string" && mongoose.Types.ObjectId.isValid(value);
+
+
 // Controller to get the authenticated user's latest grantor archive request for a specific connection.
 export const getMyGrantorArchiveRequest = async (
   req: Request,

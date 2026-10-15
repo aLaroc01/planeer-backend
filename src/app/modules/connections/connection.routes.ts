@@ -14,6 +14,7 @@ import {
   acceptProxyDirectly,
   denyProxyDirectly,
   sendConnectionRequest,
+  getPendingGrantorArchiveRequests,
 } from "../connections/connection.controller";
 import { get } from "mongoose";
 import { requireEntitledGrantor } from "../../middleware/requireEntitledGrantor";
@@ -47,7 +48,7 @@ connectionRoutes.get("/connections/proxy/invite/:token", validateProxyInvite);
 // Route for proxy user to update information on connections
 // connectionRoutes.post("/connections/proxy/update", auth, updateConnectionProxyInfo)
 
-// Route for proxy user to update preauthorized release information on connections
+// Route for proxy user to request archive of grantor information on connections
 connectionRoutes.post("/connections/:connectionId/request-archive", auth, requestGrantorArchive);
 
 // Route to get a specific archive request for a connection
@@ -64,7 +65,12 @@ connectionRoutes.post(
   reviewGrantorArchiveRequest,
 );
 
-connectionRoutes.post("/connections/:connectionId/verify-release", auth, isAdminOrSuperAdmin, reviewGrantorArchiveRequest);
+connectionRoutes.get(
+  "/archive-requests",
+  auth,
+  isAdminOrSuperAdmin,
+  getPendingGrantorArchiveRequests,
+);
 
 
 

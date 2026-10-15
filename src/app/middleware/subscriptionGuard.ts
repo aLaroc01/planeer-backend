@@ -4,24 +4,31 @@ import { checkActiveSubscription } from "../modules/subscriptions-information/su
 import { NextFunction, Request, Response } from "express";
 
 export const subscriptionGuard = async (
-    req: Request,
-    res: Response,
-    next: NextFunction
+  req: Request,
+  res: Response,
+  next: NextFunction
 ) => {
-    const userId = req.user?._id; // auth middleware থেকে
+  try {
+    const userId = req.user?._id;
 
     if (!userId) {
-        throw new AppError(StatusCodes.UNAUTHORIZED, 'Unauthorized');
+      throw new AppError(
+        StatusCodes.UNAUTHORIZED,
+        "Unauthorized"
+      );
     }
 
     const isActive = await checkActiveSubscription(userId);
 
     if (!isActive) {
-        throw new AppError(
-            StatusCodes.FORBIDDEN,
-            'Subscription expired or inactive'
-        );
+      throw new AppError(
+        StatusCodes.FORBIDDEN,
+        "Subscription expired or inactive"
+      );
     }
 
-    next();
+    return next();
+  } catch (error) {
+    return next(error);
+  }
 };

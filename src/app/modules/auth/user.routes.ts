@@ -5,7 +5,7 @@ import { adminDeleteUser, AdminEmail, adminLoginController, adminUpdateUser,
     GetProfileData, getSystemPerformance, getUsersWhoAddedMeAsProxyController, getUsersWhoSetMyProxy, 
     loginUser,  ProxysetController, registerUser, searchUsersController, updateUserController, 
     UserAnalysisController, UserList, userSelfUpdate, getAccountStatus } from "./user.controller";
-import { auth, isAdmin } from './../../middleware/auth.middleware';
+import { auth, isAdminOrSuperAdmin } from './../../middleware/auth.middleware';
 
 
 
@@ -71,15 +71,11 @@ router.post("/adminregister",registerUser)
 // admin  routes
 router.post("/adminlogin",adminLoginController)
 
-
 // admin  routes
 router.post("/AdminEmail",AdminEmail)
 
-
 // codeverify  routes
 router.post("/codeverify",codeverify)
-
-
 
 // codeverify  routes
 router.post("/forgetPassword",forgetPassword)
@@ -87,34 +83,27 @@ router.post("/forgetPassword",forgetPassword)
 // User List with Pagination
 // router.get("/pagenationlist/:pageNo/:perPage/:searchKeyword",auth,isAdmin, UserList);
 
-router.get("/pagenationlist", auth, isAdmin, UserList);
+router.get("/pagenationlist", auth, isAdminOrSuperAdmin, UserList);
 
 // New Users in Last 10 Days
-router.get("/new-user-last",auth,isAdmin, getNewUsersLast10Days);
-
+router.get("/new-user-last", auth, isAdminOrSuperAdmin, getNewUsersLast10Days);
 
 // Update User by Admin
-router.put("/updateUser/:id",auth,isAdmin,updateUserController)
-
+router.put("/updateUser/:id",auth, isAdminOrSuperAdmin, updateUserController)
 
 // User Analysis
-router.get("/users/analysis", auth,isAdmin,UserAnalysisController.getAnalysis);
+router.get("/users/analysis", auth, isAdminOrSuperAdmin, UserAnalysisController.getAnalysis);
 
 //count
-router.get("/counts-user-report", auth,isAdmin, getCounts);
+router.get("/counts-user-report", auth, isAdminOrSuperAdmin, getCounts);
 
-
-
-router.delete("/deleteUser/:id", auth,isAdmin, adminDeleteUser);
-
+router.delete("/deleteUser/:id", auth, isAdminOrSuperAdmin, adminDeleteUser);
 
 // User Profile Update
-router.put("/adminUpdateUser/:id",auth,isAdmin,adminUpdateUser)
-
-
+router.put("/adminUpdateUser/:id", auth, isAdminOrSuperAdmin,adminUpdateUser)
 
 // system performance api 
-router.get("/performance",auth,isAdmin, getSystemPerformance);
+router.get("/performance",auth, isAdminOrSuperAdmin, getSystemPerformance);
 
 
 
