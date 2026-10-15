@@ -1266,7 +1266,6 @@ export const getCountsService = async (req: Request) => {
     const [
       totalUsers,
       activeUsers,
-      inactiveUsers,
       pendingUsers,
       suspendedUsers,
       archivedUsers,
@@ -1276,7 +1275,6 @@ export const getCountsService = async (req: Request) => {
     ] = await Promise.all([
       User.countDocuments(),
       User.countDocuments({ accountStatus: "ACTIVE" }),
-      User.countDocuments({ accountStatus: "INACTIVE" }),
       User.countDocuments({
         accountStatus: "PENDING_VERIFICATION",
       }),
@@ -1297,6 +1295,8 @@ export const getCountsService = async (req: Request) => {
       ReportModel.countDocuments(),
     ]);
 
+    const inactiveUsers = totalUsers - activeUsers;
+    
     const calculatePercentage = (
       current: number,
       previous: number,
