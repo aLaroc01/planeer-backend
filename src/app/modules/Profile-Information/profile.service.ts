@@ -6,6 +6,7 @@ import express, { Request } from "express";
 import path from "path";
 import fs from "fs";
 
+
 export const ProfileCreateService = async (req: Request) => {
   const userId = req.user?.id;
   const { data, onboardingType } = req.body;
@@ -152,20 +153,39 @@ export const ProfileGetService = async (req: Request) => {
       return { status: "failed", message: "Unauthorized" };
     }
 
-    const profileData = await ProfileModel.findOne(
-      { userID: user_id },
-      "-createdAt -updatedAt"
-    );
+    const [profileData, userData] = await Promise.all([
+      ProfileModel.findOne(
+        { userID: user_id },
+        "-createdAt -updatedAt",
+      ),
+      User.findById(user_id).select(
+        "email phoneNumber role accountStatus planStatus archiveExpiresAt",
+      ),
+    ]);
 
     if (!profileData) {
       return { status: "failed", message: "No profile data found" };
     }
 
-    // console.log("ProfileGetService called. Retrieved profile data:", profileData);  
+    if (!userData) {
+      return { status: "failed", message: "User not found" };
+    }
+
     return {
       status: "success",
       message: "Profile data retrieved successfully",
-      data: profileData,
+      data: {
+        profile: profileData,
+        user: {
+          _id: userData._id,
+          email: userData.email,
+          phoneNumber: userData.phoneNumber,
+          role: userData.role,
+          accountStatus: userData.accountStatus,
+          planStatus: userData.planStatus,
+          archiveExpiresAt: userData.archiveExpiresAt,
+        },
+      },
     };
   } catch (error: any) {
     return { status: "failed", message: error.message };
