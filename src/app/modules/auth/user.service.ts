@@ -1266,20 +1266,14 @@ export const getCountsService = async (req: Request) => {
     const [
       totalUsers,
       activeUsers,
-      pendingUsers,
-      suspendedUsers,
-      archivedUsers,
       newUsersThisMonth,
       newUsersLastMonth,
+      activeUsersLastMonth,
+      inactiveUsersLastMonth,
       totalReports,
     ] = await Promise.all([
       User.countDocuments(),
       User.countDocuments({ accountStatus: "ACTIVE" }),
-      User.countDocuments({
-        accountStatus: "PENDING_VERIFICATION",
-      }),
-      User.countDocuments({ accountStatus: "SUSPENDED" }),
-      User.countDocuments({ accountStatus: "ARCHIVED" }),
       User.countDocuments({
         createdAt: {
           $gte: startOfThisMonth,
@@ -1292,10 +1286,26 @@ export const getCountsService = async (req: Request) => {
           $lte: endOfLastMonth,
         },
       }),
+      User.countDocuments({
+        accountStatus: "ACTIVE",
+        createdAt: {
+          $gte: startOfLastMonth,
+          $lte: endOfLastMonth,
+        },
+      }),
+      User.countDocuments({
+        accountStatus: { $ne: "ACTIVE" },
+        createdAt: {
+          $gte: startOfLastMonth,
+          $lte: endOfLastMonth,
+        },
+      }),
       ReportModel.countDocuments(),
     ]);
 
+
     const inactiveUsers = totalUsers - activeUsers;
+
 
     const calculatePercentage = (
       current: number,
@@ -1310,10 +1320,24 @@ export const getCountsService = async (req: Request) => {
       );
     };
 
+
     const newUsersPercent = calculatePercentage(
       newUsersThisMonth,
       newUsersLastMonth,
     );
+
+
+    const activeUsersPercent = calculatePercentage(
+      activeUsers,
+      activeUsersLastMonth,
+    );
+
+
+    const inactiveUsersPercent = calculatePercentage(
+      inactiveUsers,
+      inactiveUsersLastMonth,
+    );
+
 
     return {
       status: true,
@@ -1321,11 +1345,10 @@ export const getCountsService = async (req: Request) => {
         totalUsers,
         activeUsers,
         inactiveUsers,
-        pendingUsers,
-        suspendedUsers,
-        archivedUsers,
         newUsers: newUsersThisMonth,
         newUsersPercent,
+        activeUsersPercent,
+        inactiveUsersPercent,
         totalReports,
       },
     };
