@@ -1296,7 +1296,7 @@ export const getCountsService = async (req: Request) => {
     ]);
 
     const inactiveUsers = totalUsers - activeUsers;
-    
+
     const calculatePercentage = (
       current: number,
       previous: number,
