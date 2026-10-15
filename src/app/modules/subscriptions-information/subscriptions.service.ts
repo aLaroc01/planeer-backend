@@ -1017,44 +1017,44 @@ export const checkActiveSubscription = async (userId: string) => {
   return true;
 };
 
-// const getMonthlyEarningsStatsFromDB = async (year: number) => {
-//   const stats = await Subscription.aggregate([
-//     {
-//       $match: {
-//         status: { $in: ['active', 'expired'] },
-//         createdAt: {
-//           $gte: new Date(`${year}-01-01`),
-//           $lte: new Date(`${year}-12-31`),
-//         },
-//       },
-//     },
-//     {
-//       $group: {
-//         _id: { month: { $month: '$createdAt' } },
-//         totalEarnings: { $sum: '$price' },
-//         totalSubscriptions: { $sum: 1 },
-//       },
-//     },
-//     {
-//       $project: {
-//         _id: 0,
-//         month: '$_id.month',
-//         totalEarnings: 1,
-//         totalSubscriptions: 1,
-//       },
-//     },
-//     {
-//       $sort: { month: 1 },
-//     },
-//   ]);
+const getMonthlyEarningsStatsFromDB = async (year: number) => {
+  const stats = await Subscription.aggregate([
+    {
+      $match: {
+        status: { $in: ['active', 'expired'] },
+        createdAt: {
+          $gte: new Date(`${year}-01-01`),
+          $lte: new Date(`${year}-12-31`),
+        },
+      },
+    },
+    {
+      $group: {
+        _id: { month: { $month: '$createdAt' } },
+        totalEarnings: { $sum: '$price' },
+        totalSubscriptions: { $sum: 1 },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        month: '$_id.month',
+        totalEarnings: 1,
+        totalSubscriptions: 1,
+      },
+    },
+    {
+      $sort: { month: 1 },
+    },
+  ]);
 
-//   return stats;
-// };
+  return stats;
+};
 
-// interface MonthlyRevenue {
-//   month: string;
-//   revenue: number;
-// }
+interface MonthlyRevenue {
+  month: string;
+  revenue: number;
+}
 
 
 export const getStripeSalesSummary = async () => {
@@ -1447,6 +1447,7 @@ export const SubscriptionService = {
   subscriptionsFromDB,
   getMonthlyRevenueService,
   getSalesSummary,
+  getMonthlyEarningsStatsFromDB,
 
   createSubscriptionCheckoutSession,
   saveSubscriptionToDB,

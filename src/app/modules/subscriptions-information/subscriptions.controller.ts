@@ -153,20 +153,20 @@ export const checkoutSuccessController = catchAsync(async (req, res ) => {
 
 
 
-//  const monthlyEarningsStats = catchAsync(async (req, res) => {
-//           const year = Number(req.query.year) || new Date().getFullYear();
+ const monthlyEarningsStats = catchAsync(async (req, res) => {
+          const year = Number(req.query.year) || new Date().getFullYear();
 
-//           const result =
-//                await SubscriptionService.getMonthlyEarningsStatsFromDB(year);
+          const result =
+               await SubscriptionService.getMonthlyEarningsStatsFromDB(year);
 
-//           sendResponse(res, {
-//                statusCode: StatusCodes.OK,
-//                success: true,
-//                message: 'Monthly earnings stats retrieved successfully',
-//                data: result,
-//           });
-//      }
-// );
+          sendResponse(res, {
+               statusCode: StatusCodes.OK,
+               success: true,
+               message: 'Monthly earnings stats retrieved successfully',
+               data: result,
+          });
+     }
+);
 
 
 export const getStripeMonthlyRevenueController = catchAsync(
@@ -383,7 +383,7 @@ export const SubscriptionController = {
      getSalesSummaryController,
      // orderSuccess,
      orderCancel,
-    //  monthlyEarningsStats,
+    monthlyEarningsStats,
     getStripeSalesSummaryController,
     createBillingPortalSession,
     stripeWebhookHandler,
