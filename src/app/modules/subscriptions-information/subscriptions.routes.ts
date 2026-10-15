@@ -1,6 +1,6 @@
 import express from 'express';
 import { auth, isAdmin } from '../../middleware/auth.middleware';
-import { checkoutSuccessController, stripeWebhookHandler, SubscriptionController } from './subscriptions.controller';
+import { checkoutSuccessController, stripeWebhookHandler, SubscriptionController, } from './subscriptions.controller';
 import { subscriptionGuard } from '../../middleware/subscriptionGuard';
 
 

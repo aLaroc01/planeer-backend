@@ -628,10 +628,6 @@ export const getUserFullProfileService = async (userId: string) => {
         _id: 0,
         name: 1,
         email: 1,
-        // financialPercentage: { $arrayElemAt: ["$financialInfo.financialPercentage", 0] },
-        // digitalInfo: { $arrayElemAt: ["$digitalInfo.digitalInfoPercentage", 0] },
-        // homeAutoInfo: { $arrayElemAt: ["$homeAutoInfo.homeautoPercentage", 0] },
-        // medicalsInfo: { $arrayElemAt: ["$medicalsInfo.medicalsPercentage", 0] },
       },
     },
   ]);
@@ -662,86 +658,8 @@ export const getAllOwnUserDataService = async (loggedInUserId: string) => {
   
   ]);
 };
-
-    // 🔢 Calculate percentages
-
-  // const homeautoPercentage = homeauto.reduce(
-  //   (sum, item) => sum + (item.homeautoPercentage || 0),
-  //   0
-  // );
-
-  // const medicalPercentage = medical.reduce(
-  //   (sum, item) => sum + (item.medicalsPercentage || 0),
-  //   0
-  // );
-
-  // const financialPercentage = financial.reduce(
-  //   (sum, item) => sum + (item.financialPercentage || 0),
-  //   0
-  // );
-
-  // const digitalInfoPercentage = digitalInfo.reduce(
-  //   (sum, item) => sum + (item.digitalInfoPercentage || 0),
-  //   0
-  // );
-
-
-
-  // userPercentage runtime only
-  // const userPercentage = user.userPercentage || 0;
-
-
-
-  // const totalPercentage =
-  //   homeautoPercentage +
-  //   medicalPercentage +
-  //   financialPercentage +
-  //   digitalInfoPercentage; 
-    // + userPercentage;
-
  
 
- // 💡 Suggestion logic (3 suggestions for every case)
-// let suggestions: string[] = [];
-
-// if (totalPercentage === 100) {
-//   suggestions = [
-//     "Profile is fully completed",
-//     "You can now access all features without any limitation",
-//     "Keep your profile updated for better experience"
-//   ];
-// } else if (totalPercentage >= 71) {
-//   suggestions = [
-//     "Your profile is almost completed",
-//     "Complete remaining sections to reach 100%",
-//     "Review and submit missing information"
-//   ];
-// } else if (totalPercentage >= 41) {
-//   suggestions = [
-//     "Your profile is partially completed",
-//     "Add more information to improve profile strength",
-//     "Completing all sections helps better service"
-//   ];
-// } else {
-//   suggestions = [
-//     "Your profile is very incomplete",
-//     "Please start adding your personal information",
-//     "Completing your profile unlocks more features"
-//   ];
-// }
-
-
-
-  // return { user,homeauto, medical, financial,digitalInfo , percentages: {
-    //   homeautoPercentage,
-    //   medicalPercentage,
-    //   financialPercentage,
-    //   digitalInfoPercentage,
-    //   // userPercentage,
-    //   totalPercentage
-    // }, suggestions };
-    
-// };
 
 
 
@@ -1313,73 +1231,109 @@ export const adminUpdateUserService = async (req: Request) => {
 
 export const getCountsService = async (req: Request) => {
   try {
-    const days = Number(req.query.days) || 30;
+    const now = new Date();
 
-    // Last N days
-    const nDaysAgo = new Date();
-    nDaysAgo.setDate(nDaysAgo.getDate() - days);
+    const startOfThisMonth = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      1,
+      0,
+      0,
+      0,
+      0,
+    );
 
-    // Last Month Range
-    const startOfLastMonth = new Date();
-    startOfLastMonth.setMonth(startOfLastMonth.getMonth() - 1, 1);
-    startOfLastMonth.setHours(0, 0, 0, 0);
+    const startOfLastMonth = new Date(
+      now.getFullYear(),
+      now.getMonth() - 1,
+      1,
+      0,
+      0,
+      0,
+      0,
+    );
 
-    const endOfLastMonth = new Date();
-    endOfLastMonth.setDate(0);
-    endOfLastMonth.setHours(23, 59, 59, 999);
-
-    // Current month range
-    const startOfThisMonth = new Date();
-    startOfThisMonth.setDate(1);
-    startOfThisMonth.setHours(0, 0, 0, 0);
-
-    const endOfThisMonth = new Date();
-    endOfThisMonth.setHours(23, 59, 59, 999);
+    const endOfLastMonth = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      0,
+      23,
+      59,
+      59,
+      999,
+    );
 
     const [
       totalUsers,
-      newUsersLastNDays,
-      lastMonthUsers,
-      currentMonthUsers,
-      totalReports
+      activeUsers,
+      inactiveUsers,
+      pendingUsers,
+      suspendedUsers,
+      archivedUsers,
+      newUsersThisMonth,
+      newUsersLastMonth,
+      totalReports,
     ] = await Promise.all([
       User.countDocuments(),
-      User.countDocuments({ createdAt: { $gte: nDaysAgo } }),
+      User.countDocuments({ accountStatus: "ACTIVE" }),
+      User.countDocuments({ accountStatus: "INACTIVE" }),
       User.countDocuments({
-        createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth }
+        accountStatus: "PENDING_VERIFICATION",
+      }),
+      User.countDocuments({ accountStatus: "SUSPENDED" }),
+      User.countDocuments({ accountStatus: "ARCHIVED" }),
+      User.countDocuments({
+        createdAt: {
+          $gte: startOfThisMonth,
+          $lte: now,
+        },
       }),
       User.countDocuments({
-        createdAt: { $gte: startOfThisMonth, $lte: endOfThisMonth }
+        createdAt: {
+          $gte: startOfLastMonth,
+          $lte: endOfLastMonth,
+        },
       }),
-      ReportModel.countDocuments()
+      ReportModel.countDocuments(),
     ]);
 
-    const calculatePercentage = (current: number, previous: number) => {
-      if (previous === 0) return 100;
-      return ((current - previous) / previous) * 100;
+    const calculatePercentage = (
+      current: number,
+      previous: number,
+    ): number => {
+      if (previous === 0) {
+        return current > 0 ? 100 : 0;
+      }
+
+      return Number(
+        (((current - previous) / previous) * 100).toFixed(2),
+      );
     };
 
-    const newUsersPercent = parseFloat(calculatePercentage(newUsersLastNDays, lastMonthUsers).toFixed(2));
-    const activeUsersPercent = parseFloat(calculatePercentage(currentMonthUsers, lastMonthUsers).toFixed(2));
-    // Example: inactive users = total - active
-    const inactiveUsers = totalUsers - currentMonthUsers;
-    const inactiveUsersPercent = parseFloat(calculatePercentage(inactiveUsers, lastMonthUsers - currentMonthUsers).toFixed(2));
+    const newUsersPercent = calculatePercentage(
+      newUsersThisMonth,
+      newUsersLastMonth,
+    );
 
     return {
       status: true,
       data: {
         totalUsers,
-        newUsersLastNDays,
-        newUsersPercent,
-        currentMonthUsers,
-        activeUsersPercent,
+        activeUsers,
         inactiveUsers,
-        inactiveUsersPercent,
-        totalReports
-      }
+        pendingUsers,
+        suspendedUsers,
+        archivedUsers,
+        newUsers: newUsersThisMonth,
+        newUsersPercent,
+        totalReports,
+      },
     };
   } catch (error) {
-    return { status: false, data: error };
+    return {
+      status: false,
+      data: error,
+    };
   }
 };
 
