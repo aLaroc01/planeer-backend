@@ -59,7 +59,7 @@ connectionRoutes.get(
 );
 // Admin approves or rejects a specific request.
 connectionRoutes.post(
-  "/archive-requests/:requestId/review",
+  "/connections/archive-requests/:requestId/review",
   auth,
   isAdminOrSuperAdmin,
   reviewGrantorArchiveRequest,
