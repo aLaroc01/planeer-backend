@@ -5,6 +5,8 @@ import { ProfileMainRole } from './profile.interface';
 import express, { Request } from "express";
 import path from "path";
 import fs from "fs";
+import { assertUserNotRestricted } from "../../../helpers/accountRestriction";
+import { restoreExpiredArchive } from "../../../helpers/restoreExpiredArchive";
 
 
 export const ProfileCreateService = async (req: Request) => {
@@ -68,19 +70,20 @@ export const ProfileCreateService = async (req: Request) => {
 
 
 export const ProfileUpdateService = async (req: Request) => {
-  // console.log("BODY RAW:", req.body);
   console.log("FILES RAW:", (req as any).files);
   try {
     const { firstName, lastName, dateOfBirth, address, city, state, zipcode, phoneNumber, imgUrl } = req.body;
     const user_id = req.user?.id;
 
-    if (!user_id) {
+    const restriction = await assertUserNotRestricted(user_id);
+
+    if (!restriction.allowed) {
       return {
         status: "failed",
-        message: "Unauthorized",
+        message: restriction.message,
       };
     }
-
+    
     const updateData: any = {};
 
     if (firstName?.trim()) updateData.firstName = firstName.trim();
@@ -152,6 +155,8 @@ export const ProfileGetService = async (req: Request) => {
     if (!user_id) {
       return { status: "failed", message: "Unauthorized" };
     }
+
+    await restoreExpiredArchive(user_id);
 
     const [profileData, userData] = await Promise.all([
       ProfileModel.findOne(

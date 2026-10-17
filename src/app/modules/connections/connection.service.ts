@@ -7,6 +7,8 @@ import { sendProxyInviteEmail } from "./sendProxyInviteEmail";
 import { SendEmail } from "../../../helpers/emailHelper";
 import Checklist from "../checklist/checklist.model";
 import mongoose from "mongoose";
+import { assertUserNotRestricted } from "../../../helpers/accountRestriction";
+
 
 /**
  * Helper: normalize email from body
@@ -22,6 +24,7 @@ export const canAddProxyForGrantor = async (grantorId: string, proxyUserId?: str
   if (!currentUser) {
     return { ok: false, message: "Current user not found" };
   }
+
 
   const currentProxyCount = Array.isArray(currentUser.proxysetId)
     ? currentUser.proxysetId.length
@@ -476,9 +479,14 @@ export const createProxyConnectionService = async (req: Request) => {
       email
     )}`;
 
-    // if (!currentUserId) {
-    //   return { status: "failed", message: "Unauthorized" };
-    // }
+    const restriction = await assertUserNotRestricted(currentUserId);
+
+    if (!restriction.allowed) {
+      return {
+        status: "failed",
+        message: restriction.message,
+      };
+    }
 
     if (!email) {
       return { status: "failed", message: "Proxy email is required" };

@@ -8,6 +8,7 @@ import { Subscription } from "./subscriptions.model";
 import { StatusCodes } from "http-status-codes";
 import { Types } from "mongoose";
 import dayjs from "dayjs";
+import { assertUserNotRestricted } from "../../../helpers/accountRestriction"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "", {
   apiVersion: "2025-10-29.clover",
@@ -295,7 +296,7 @@ export const syncSubscriptionFromStripe = async (
   const hasEntitledSubscription = await Subscription.exists({
     userId: new Types.ObjectId(userId),
     stripeStatus: {
-      $in: [...ENTITLED_SUBSCRIPTION_STATUSES],
+      $in: [...OPEN_SUBSCRIPTION_STATUSES],
     },
     currentPeriodEnd: { $gt: new Date() },                         
   });
@@ -602,6 +603,15 @@ export const createBillingPortalSession = async (userId: string) => {
   if (!user) {
     throw new AppError(StatusCodes.NOT_FOUND, "User not found");
   }
+
+  const restriction = await assertUserNotRestricted(userId);
+
+    if (!restriction.allowed) {
+      return {
+        status: "failed",
+        message: restriction.message,
+      };
+    }
 
   if (!user.stripeCustomerId) {
     throw new AppError(

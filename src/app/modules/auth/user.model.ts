@@ -118,4 +118,9 @@ userSchema.virtual("profile", {
   justOne: true,
 });
 
+userSchema.index({
+  planStatus: 1,
+  archiveExpiresAt: 1,
+});
+
 export const User = model<IUser>("User", userSchema);

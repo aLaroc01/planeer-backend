@@ -27,7 +27,7 @@
     "mongodb": "^7.0.0",
     "mongoose": "^8.20.1",
     "morgan": "^1.10.1",
-    "node-cron": "^4.2.1",
+    "node-cron": "^4.6.0",
     "nodemailer": "^7.0.5",
     "nodemailer-mailgun-transport": "^2.1.5",
     "serverless-http": "^4.0.0",

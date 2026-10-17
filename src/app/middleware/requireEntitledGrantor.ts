@@ -3,6 +3,7 @@ import { NextFunction, Request, Response } from "express";
 import { StatusCodes } from "http-status-codes";
 import { getSubscriptionAccess } from
   "../modules/subscriptions-information/subscriptionAccess.service";
+import { assertUserNotRestricted } from "../../helpers/accountRestriction";
 
 export const requireEntitledGrantor = async (
   req: Request,
@@ -17,6 +18,16 @@ export const requireEntitledGrantor = async (
       message: "Authentication is required.",
     });
   }
+
+  const restriction = await assertUserNotRestricted(userId);
+
+    if (!restriction.allowed) {
+      return res.status(StatusCodes.FORBIDDEN).json({
+        success: false,
+        code: "ACCOUNT_RESTRICTED",
+        message: restriction.message,
+      });
+    }
 
   const access = await getSubscriptionAccess(userId);
 
