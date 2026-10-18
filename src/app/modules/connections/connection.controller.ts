@@ -799,6 +799,14 @@ export const getMyGrantorArchiveRequest = async (
       .sort({ createdAt: -1, _id: -1 })
       .lean();
 
+      console.log("Archive request lifecycle:", {
+        requestId: archiveRequest?._id,
+        archiveType: archiveRequest?.archiveType,
+        archiveExpiresAt: archiveRequest?.archiveExpiresAt,
+        archiveEndedAt: archiveRequest?.archiveEndedAt,
+        archiveEndReason: archiveRequest?.archiveEndReason,
+      });
+
     return res.status(200).json({
       success: true,
       message: archiveRequest
