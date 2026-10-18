@@ -794,7 +794,8 @@ export const getMyGrantorArchiveRequest = async (
     })
       .select(
         "_id connectionId grantorId reason status " +
-        "requesterNote createdAt reviewedAt",
+          "requesterNote createdAt reviewedAt " +
+          "archiveType archiveExpiresAt archiveEndedAt archiveEndReason",
       )
       .sort({ createdAt: -1, _id: -1 })
       .lean();
