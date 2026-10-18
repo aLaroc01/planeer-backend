@@ -19,6 +19,7 @@ import {
 } from "../archive-request/archive-request.model";
 import { PlanStatus, Role } from "../auth/user.interface";
 import mongoose from "mongoose";
+import { restoreExpiredArchive } from "../../../helpers/restoreExpiredArchive";
 
 
 const getProxyEmail = (body: any) =>
@@ -659,15 +660,26 @@ export const reviewGrantorArchiveRequest = async (
               "The grantor account is already archived.",
             );
           }
-
+          
           grantor.planStatus = PlanStatus.ARCHIVED;
           grantor.planStatusChangedAt = now;
           grantor.planStatusChangedBy = reviewerObjectId;
           grantor.archiveExpiresAt = approvedExpiry;
+          grantor.activeArchiveRequestId = archiveRequest._id;
+
+          // Record the approved archive settings on this request.
+          archiveRequest.archiveType =
+            archiveType === "temporary" ? "temporary" : "permanent";
+
+          archiveRequest.archiveExpiresAt = approvedExpiry;
+          archiveRequest.archiveEndedAt = null;
+          archiveRequest.archiveEndReason = null;
 
           await grantor.save({ session });
         }
 
+        // Preserve the admin's review decision separately
+        // from the archive lifecycle.
         archiveRequest.status = approving
           ? ArchiveRequestStatus.APPROVED
           : ArchiveRequestStatus.REJECTED;
@@ -770,6 +782,10 @@ export const getMyGrantorArchiveRequest = async (
           "An active grantor connection belonging to you was not found.",
       });
     }
+
+    await restoreExpiredArchive(
+      connection.grantorId.toString(),
+    );
 
     const archiveRequest = await ArchiveRequest.findOne({
       connectionId: connection._id,

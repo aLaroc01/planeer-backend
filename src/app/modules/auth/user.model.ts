@@ -32,6 +32,12 @@ const userSchema = new Schema<IUser>(
       index: true,
     },
 
+    activeArchiveRequestId: {
+      type: Schema.Types.ObjectId,
+      ref: "ArchiveRequest",
+      default: null,
+    },
+
     planStatus: {
       type: String,
       enum: Object.values(PlanStatus),

@@ -26,6 +26,11 @@ export interface IArchiveRequest {
 
   requesterNote: string;
 
+  archiveType: "temporary" | "permanent" | null;
+  archiveExpiresAt: Date | null;
+  archiveEndedAt: Date | null;
+  archiveEndReason: ArchiveEndReason | null;
+
   // References to verified private uploads,
   // not public URLs or arbitrary client-supplied paths.
   evidenceFileIds: Types.ObjectId[];
@@ -36,6 +41,11 @@ export interface IArchiveRequest {
 
   createdAt: Date;
   updatedAt: Date;
+}
+
+export enum ArchiveEndReason {
+  EXPIRED = "EXPIRED",
+  ADMIN_RESTORED = "ADMIN_RESTORED",
 }
 
 const archiveRequestSchema = new Schema<IArchiveRequest>(
@@ -83,6 +93,28 @@ const archiveRequestSchema = new Schema<IArchiveRequest>(
     evidenceFileIds: {
       type: [Schema.Types.ObjectId],
       default: [],
+    },
+
+    archiveType: {
+      type: String,
+      enum: ["temporary", "permanent"],
+      default: null,
+    },
+
+    archiveExpiresAt: {
+      type: Date,
+      default: null,
+    },
+
+    archiveEndedAt: {
+      type: Date,
+      default: null,
+    },
+
+    archiveEndReason: {
+      type: String,
+      enum: Object.values(ArchiveEndReason),
+      default: null,
     },
 
     reviewedBy: {

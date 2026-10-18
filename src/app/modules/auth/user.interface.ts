@@ -37,6 +37,7 @@ export interface IUser extends Document {
   otpExpiresAt?: Date | null;
   otpVerified: boolean;
 
+  activeArchiveRequestId?: Types.ObjectId | null;
   role: Role;
 
   accountStatus: AccountStatus;
