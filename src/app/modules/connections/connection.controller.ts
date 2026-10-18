@@ -753,7 +753,6 @@ export const getMyGrantorArchiveRequest = async (
         message: "Authentication is required.",
       });
     }
-
     if (
       typeof connectionId !== "string" ||
       !/^[a-fA-F0-9]{24}$/.test(connectionId)
