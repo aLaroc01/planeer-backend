@@ -424,6 +424,14 @@ export const requestGrantorArchive = async (
       status: ArchiveRequestStatus.PENDING,
     });
 
+    console.log("Archive request lifecycle:", {
+        requestId: archiveRequest?._id,
+        archiveType: archiveRequest?.archiveType,
+        archiveExpiresAt: archiveRequest?.archiveExpiresAt,
+        archiveEndedAt: archiveRequest?.archiveEndedAt,
+        archiveEndReason: archiveRequest?.archiveEndReason,
+      });
+
     return res.status(201).json({
       success: true,
       message: "Grantor archive request submitted for review.",
