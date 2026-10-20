@@ -13,7 +13,7 @@ import { MedicalInfoModel } from "../../modules/medical-Information/medical.mode
 import { HomeAutoModel } from "../homeAuto-Information/homeauto.model";
 import { PersonalModel } from "../../modules/personal-Information/personal.model";
 import { ProfileModel } from "../Profile-Information/profile.model";
-import { DigitalInfoModel } from "../../modules/digital-Information/digital.model";
+import { DigitalInfoModel } from "../digital-Information/digital.model";
 import { ProxyUser, ProxyUserResponse, AccountStatus, Role } from "./user.interface";
 import { AuditLog } from "../audit-log/auditLog.model";
 import { AuditAction } from "../audit-log/auditLog.interface";
