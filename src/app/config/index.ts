@@ -4,7 +4,7 @@ dotenv.config();
 
 export const config = {
   port: process.env.PORT || 3000,   
-  db_uri: process.env.MongoDB_URI,
+  db_uri: process.env.MongoDB_Production_URI,
   jwt_secret: process.env.JWT_SECRET,
   stripe_secret_key:process.env.STRIPE_SECRET_KEY,
   //copy
