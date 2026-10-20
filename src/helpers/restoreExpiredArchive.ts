@@ -23,10 +23,9 @@ export const restoreExpiredArchive = async (
       },
     })
       .select(
-        "_id connectionId grantorId reason status " +
-            "requesterNote createdAt reviewedAt " +
-            "archiveType archiveExpiresAt archiveEndedAt archiveEndReason",
-        )
+        "_id planStatus archiveExpiresAt " +
+          "activeArchiveRequestId planStatusChangedAt",
+      )
       .session(session);
 
     if (!user) return false;
@@ -104,6 +103,8 @@ export const restoreExpiredArchive = async (
 
     archiveRequest.archiveEndedAt = now;
     archiveRequest.archiveEndReason = ArchiveEndReason.EXPIRED;
+    archiveRequest.archiveEndedBy = null;
+    archiveRequest.archiveEndNote = "";
 
     await archiveRequest.save({ session });
 

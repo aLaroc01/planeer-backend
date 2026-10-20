@@ -1,6 +1,6 @@
 
 import express from "express";
-import { auth, isAdminOrSuperAdmin } from "../../middleware/auth.middleware";
+import { auth, isAdminOrSuperAdmin, isSuperAdmin } from "../../middleware/auth.middleware";
 import {
   createProxyConnection,
   createDirectProxyConnectionService,
@@ -15,6 +15,7 @@ import {
   denyProxyDirectly,
   sendConnectionRequest,
   getPendingGrantorArchiveRequests,
+  restoreGrantorArchive,
 } from "../connections/connection.controller";
 import { get } from "mongoose";
 import { requireEntitledGrantor } from "../../middleware/requireEntitledGrantor";
@@ -72,6 +73,11 @@ connectionRoutes.get(
   getPendingGrantorArchiveRequests,
 );
 
-
+connectionRoutes.post(
+  "/connections/archive-requests/:requestId/restore",
+  auth,
+  isSuperAdmin,
+  restoreGrantorArchive,
+);
 
 export default connectionRoutes;

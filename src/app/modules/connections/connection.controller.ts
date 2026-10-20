@@ -16,10 +16,12 @@ import {
   ArchiveRequest,
   ArchiveRequestReason,
   ArchiveRequestStatus,
+  ArchiveEndReason,
 } from "../archive-request/archive-request.model";
 import { PlanStatus, Role } from "../auth/user.interface";
 import mongoose from "mongoose";
 import { restoreExpiredArchive } from "../../../helpers/restoreExpiredArchive";
+import { Subscription } from "../../modules/subscriptions-information/subscriptions.model"
 
 
 const getProxyEmail = (body: any) =>
@@ -311,7 +313,6 @@ export const requestGrantorArchive = async (
         message: "Requester note cannot exceed 2,000 characters.",
       });
     }
-
     /*
      * Evidence attachment validation is not wired up yet.
      * Allow omitted/empty evidence only; never accept unverified IDs.
@@ -423,14 +424,6 @@ export const requestGrantorArchive = async (
 
       status: ArchiveRequestStatus.PENDING,
     });
-
-    console.log("Archive request lifecycle:", {
-        requestId: archiveRequest?._id,
-        archiveType: archiveRequest?.archiveType,
-        archiveExpiresAt: archiveRequest?.archiveExpiresAt,
-        archiveEndedAt: archiveRequest?.archiveEndedAt,
-        archiveEndReason: archiveRequest?.archiveEndReason,
-      });
 
     return res.status(201).json({
       success: true,
@@ -807,13 +800,6 @@ export const getMyGrantorArchiveRequest = async (
       .sort({ createdAt: -1, _id: -1 })
       .lean();
 
-      console.log("Archive request lifecycle:", {
-        requestId: archiveRequest?._id,
-        archiveType: archiveRequest?.archiveType,
-        archiveExpiresAt: archiveRequest?.archiveExpiresAt,
-        archiveEndedAt: archiveRequest?.archiveEndedAt,
-        archiveEndReason: archiveRequest?.archiveEndReason,
-      });
 
     return res.status(200).json({
       success: true,
@@ -826,6 +812,273 @@ export const getMyGrantorArchiveRequest = async (
     return next(error);
   }
 };
+
+
+// Manually restore grantor controller
+export const restoreGrantorArchive = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  const reject = (
+    statusCode: number,
+    message: string,
+  ): never => {
+    const error = new Error(message) as Error & {
+      statusCode: number;
+      archiveRestoreError: boolean;
+    };
+
+    error.statusCode = statusCode;
+    error.archiveRestoreError = true;
+
+    throw error;
+  };
+
+  try {
+    const actorId = req.user?._id;
+    const { requestId } = req.params;
+
+    if (!actorId) {
+      return reject(401, "Authentication is required.");
+    }
+
+    // Defense in depth alongside the route middleware.
+    if (req.user?.role !== Role.SUPER_ADMIN) {
+      return reject(
+        403,
+        "Only super admins can manually restore archived accounts.",
+      );
+    }
+
+    if (
+      typeof requestId !== "string" ||
+      !/^[a-fA-F0-9]{24}$/.test(requestId)
+    ) {
+      return reject(400, "Invalid archive request ID.");
+    }
+
+    const { restorationNote } = req.body ?? {};
+
+    if (
+      typeof restorationNote !== "string" ||
+      !restorationNote.trim()
+    ) {
+      return reject(400, "A restoration note is required.");
+    }
+
+    const normalizedNote = restorationNote.trim();
+
+    if (normalizedNote.length > 2000) {
+      return reject(
+        400,
+        "Restoration note cannot exceed 2,000 characters.",
+      );
+    }
+
+    const actorObjectId = new mongoose.Types.ObjectId(
+      actorId.toString(),
+    );
+
+    const result = await mongoose.connection.transaction(
+      async (session) => {
+        // Recheck the current database role in this transaction.
+        const authorizedActor = await User.exists({
+          _id: actorObjectId,
+          role: Role.SUPER_ADMIN,
+        }).session(session);
+
+        if (!authorizedActor) {
+          return reject(
+            403,
+            "Super admin access is required.",
+          );
+        }
+
+        const archiveRequest = await ArchiveRequest.findById(
+          requestId,
+        ).session(session);
+
+        if (!archiveRequest) {
+          return reject(404, "Archive request not found.");
+        }
+
+        if (
+          archiveRequest.status !== ArchiveRequestStatus.APPROVED ||
+          archiveRequest.archiveEndedAt != null ||
+          archiveRequest.archiveEndReason != null
+        ) {
+          return reject(
+            409,
+            "This request does not have an active approved archive.",
+          );
+        }
+
+        const validArchiveSettings =
+          (
+            archiveRequest.archiveType === "temporary" &&
+            archiveRequest.archiveExpiresAt instanceof Date &&
+            !Number.isNaN(
+              archiveRequest.archiveExpiresAt.getTime(),
+            )
+          ) ||
+          (
+            archiveRequest.archiveType === "permanent" &&
+            archiveRequest.archiveExpiresAt === null
+          );
+
+        if (!validArchiveSettings) {
+          return reject(
+            409,
+            "Archive settings are incomplete. Reconciliation is required.",
+          );
+        }
+
+        const grantor = await User.findById(
+          archiveRequest.grantorId,
+        )
+          .select(
+            "_id planStatus archiveExpiresAt " +
+              "activeArchiveRequestId planStatusChangedAt",
+          )
+          .session(session);
+
+        if (!grantor) {
+          return reject(404, "Grantor account not found.");
+        }
+
+        if (
+          grantor.planStatus !== PlanStatus.ARCHIVED ||
+          grantor.activeArchiveRequestId?.toString() !==
+            archiveRequest._id.toString()
+        ) {
+          return reject(
+            409,
+            "This request is not the account's active archive.",
+          );
+        }
+
+        const grantorExpiry =
+          grantor.archiveExpiresAt?.getTime() ?? null;
+
+        const requestExpiry =
+          archiveRequest.archiveExpiresAt?.getTime() ?? null;
+
+        if (grantorExpiry !== requestExpiry) {
+          return reject(
+            409,
+            "Account and request archive settings do not match. Reconciliation is required.",
+          );
+        }
+
+        const now = new Date();
+
+        // Leave expired temporary archives to the expiration workflow.
+        if (
+          archiveRequest.archiveType === "temporary" &&
+          archiveRequest.archiveExpiresAt!.getTime() <=
+            now.getTime()
+        ) {
+          return reject(
+            409,
+            "This archive has reached its expiration. Run the expiration restoration workflow instead.",
+          );
+        }
+
+        const activeSubscription = await Subscription.exists({
+          userId: grantor._id,
+          stripeStatus: "active",
+          currentPeriodEnd: { $gt: now },
+        }).session(session);
+
+        const trialSubscription = activeSubscription
+          ? null
+          : await Subscription.exists({
+              userId: grantor._id,
+              stripeStatus: "trialing",
+              currentPeriodEnd: { $gt: now },
+            }).session(session);
+
+        const restoredStatus = activeSubscription
+          ? PlanStatus.ACTIVE
+          : trialSubscription
+            ? PlanStatus.TRIALING
+            : PlanStatus.SUBSCRIPTION_REQUIRED;
+
+        const updateResult = await User.updateOne(
+          {
+            _id: grantor._id,
+            planStatus: PlanStatus.ARCHIVED,
+            activeArchiveRequestId: archiveRequest._id,
+            archiveExpiresAt: grantor.archiveExpiresAt,
+            planStatusChangedAt:
+              grantor.planStatusChangedAt ?? null,
+          },
+          {
+            $set: {
+              planStatus: restoredStatus,
+              archiveExpiresAt: null,
+              activeArchiveRequestId: null,
+              planStatusChangedAt: now,
+              planStatusChangedBy: actorObjectId,
+            },
+          },
+          {
+            session,
+            runValidators: true,
+          },
+        );
+
+        if (updateResult.modifiedCount !== 1) {
+          return reject(
+            409,
+            "Archive state changed during restoration.",
+          );
+        }
+
+        archiveRequest.archiveEndedAt = now;
+        archiveRequest.archiveEndReason =
+          ArchiveEndReason.ADMIN_RESTORED;
+        archiveRequest.archiveEndedBy = actorObjectId;
+        archiveRequest.archiveEndNote = normalizedNote;
+
+        await archiveRequest.save({ session });
+
+        return {
+          requestId: archiveRequest._id,
+          grantorId: grantor._id,
+          planStatus: restoredStatus,
+          archiveEndedAt: archiveRequest.archiveEndedAt,
+          archiveEndReason: archiveRequest.archiveEndReason,
+          archiveEndedBy: archiveRequest.archiveEndedBy,
+          archiveEndNote: archiveRequest.archiveEndNote,
+        };
+      },
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Archive reversed. Account access now follows its subscription status.",
+      data: result,
+    });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      "archiveRestoreError" in error &&
+      error.archiveRestoreError === true &&
+      "statusCode" in error &&
+      typeof error.statusCode === "number"
+    ) {
+      return res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    return next(error);
+  }
+};
+
 
 // Controller to get pending grantor archive requests for admin users.
 export const getPendingGrantorArchiveRequests = async (

@@ -31,6 +31,9 @@ export interface IArchiveRequest {
   archiveEndedAt: Date | null;
   archiveEndReason: ArchiveEndReason | null;
 
+  archiveEndedBy: Types.ObjectId | null;
+  archiveEndNote: string;
+
   // References to verified private uploads,
   // not public URLs or arbitrary client-supplied paths.
   evidenceFileIds: Types.ObjectId[];
@@ -115,6 +118,19 @@ const archiveRequestSchema = new Schema<IArchiveRequest>(
       type: String,
       enum: Object.values(ArchiveEndReason),
       default: null,
+    },
+
+    archiveEndedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
+    archiveEndNote: {
+      type: String,
+      trim: true,
+      maxlength: 2000,
+      default: "",
     },
 
     reviewedBy: {
