@@ -10,6 +10,7 @@ import {
   acceptProxyDirectService,
   denyProxyDirectService,
   sendConnectionRequestService,
+  cancelConnectionService,
 } from "../connections/connection.service";
 import { ProfileGetService } from "../Profile-Information/profile.service";
 import {
@@ -112,6 +113,28 @@ export const sendConnectionRequest = async (req: Request, res: Response) => {
     return res.status(500).json({
       status: "failed",
       message: error.message || "Something went wrong",
+    });
+  }
+};
+
+
+// Remove connection controller
+export const cancelConnectionDirectly = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const result = await cancelConnectionService(req);
+
+    const statusCode =
+      result.status === "success" ? 200 : 400;
+
+    return res.status(statusCode).json(result);
+  } catch (error: any) {
+    return res.status(500).json({
+      status: "failed",
+      message:
+        error?.message || "Failed to cancel connection",
     });
   }
 };

@@ -26,9 +26,10 @@ export const canAddProxyForGrantor = async (grantorId: string, proxyUserId?: str
   }
 
 
-  const currentProxyCount = Array.isArray(currentUser.proxysetId)
-    ? currentUser.proxysetId.length
-    : 0;
+  const currentProxyCount = await Connection.countDocuments({
+  grantorId,
+    status: { $in: ["invited", "active"] },
+  });
 
   if (currentProxyCount >= 2) {
     return { ok: false, message: "You can only have 2 proxies" };
@@ -530,7 +531,6 @@ export const createProxyConnectionService = async (req: Request) => {
           otp,
           otpExpiresAt,
           otpPurpose: "proxy-verification",
-          password: "",
         },
       },
       { upsert: true }
@@ -628,6 +628,119 @@ export const createProxyConnectionService = async (req: Request) => {
 // };
 
 
+// remove a proxy
+export const cancelConnectionService = async (req: Request) => {
+  const currentUserId = req.user?.id;
+  const connectionId = req.body?.connId;
+
+  if (!currentUserId) {
+    return {
+      status: "failed",
+      message: "Unauthorized",
+    };
+  }
+
+  if (
+    typeof connectionId !== "string" ||
+    !mongoose.Types.ObjectId.isValid(connectionId)
+  ) {
+    return {
+      status: "failed",
+      message: "Invalid connection ID",
+    };
+  }
+
+  try {
+    const data = await mongoose.connection.transaction(
+      async (session) => {
+        const connection = await Connection.findOne({
+          _id: connectionId,
+          $or: [
+            { grantorId: currentUserId },
+            { proxyUserId: currentUserId },
+          ],
+        }).session(session);
+
+        if (!connection) {
+          throw new Error(
+            "Connection not found or you do not have permission",
+          );
+        }
+
+        // Repeated requests should not overwrite the audit fields.
+        if (connection.status !== "cancelled") {
+          connection.status = "cancelled";
+          connection.cancelledAt = new Date();
+          connection.cancelledBy = currentUserId;
+
+          connection.inviteToken = null;
+          connection.otp = null;
+          connection.otpExpiresAt = null;
+
+          connection.preauthorizedReleaseEnabled = false;
+
+          await connection.save({ session });
+        }
+
+        if (connection.proxyUserId) {
+          await User.updateOne(
+            { _id: connection.grantorId },
+            {
+              $pull: {
+                proxysetId: connection.proxyUserId,
+              },
+            },
+            { session },
+          );
+          const checklistFilter = {
+            userId: connection.grantorId,
+          };
+
+          await Checklist.updateOne(
+            {
+              ...checklistFilter,
+              primaryProxyId: connection.proxyUserId,
+            },
+            {
+              $set: { primaryProxyId: null },
+            },
+            { session },
+          );
+
+          await Checklist.updateOne(
+            {
+              ...checklistFilter,
+              secondaryProxyId: connection.proxyUserId,
+            },
+            {
+              $set: { secondaryProxyId: null },
+            },
+            { session },
+          );
+        }
+
+        return {
+          connectionId: String(connection._id),
+          status: connection.status,
+          cancelledAt: connection.cancelledAt,
+        };
+      },
+    );
+
+    return {
+      status: "success",
+      message: "Connection cancelled successfully",
+      data,
+    };
+  } catch (error: any) {
+    return {
+      status: "failed",
+      message:
+        error?.message || "Failed to cancel connection",
+    };
+  }
+};
+
 // deny connection invite AS proxy
 export const denyProxyDirectService = async (req: Request) => {
   
@@ -644,7 +757,7 @@ export const denyProxyDirectService = async (req: Request) => {
       }, // find the connection where this user is the proxy with connection id
       {
         $set: {
-          status: "denied",
+          status: "rejected",
           acceptedAt: new Date(), 
         },
       },
@@ -652,7 +765,7 @@ export const denyProxyDirectService = async (req: Request) => {
     // console.log("deny updated connection:", connection);
     return {
         status: "success",
-        message: "Proxy connection was denied!",
+        message: "Proxy connection was rejected!",
         data: connection,
       };
   } catch (error: any) {
@@ -684,6 +797,7 @@ export const acceptProxyDirectService = async (req: Request) => {
         {
           proxyUserId: new mongoose.Types.ObjectId(proxyId),
           _id: new mongoose.Types.ObjectId(connectionId),
+          status: { $in: ["invited", "pending"] },
         },
         {
           $set: {
@@ -691,7 +805,10 @@ export const acceptProxyDirectService = async (req: Request) => {
             acceptedAt: new Date(),
           },
         },
-        { new: true }
+        {
+          new: true,
+          runValidators: true,
+        },
       );
 
       if (!connection) {

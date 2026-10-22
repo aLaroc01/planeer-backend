@@ -16,6 +16,7 @@ import {
   sendConnectionRequest,
   getPendingGrantorArchiveRequests,
   restoreGrantorArchive,
+  cancelConnectionDirectly,
 } from "../connections/connection.controller";
 import { get } from "mongoose";
 import { requireEntitledGrantor } from "../../middleware/requireEntitledGrantor";
@@ -42,6 +43,9 @@ connectionRoutes.post("/connections/request", auth, requireEntitledGrantor, send
 
 // Route to validate proxy invite token (called when user clicks email link)
 connectionRoutes.get("/connections/proxy/invite/:token", validateProxyInvite);
+
+// Route to canceling connection
+connectionRoutes.post("/connections/cancel", auth, cancelConnectionDirectly,);
 
 // Route for proxy user to accept invite after authenticating (called from client after validating token)
 // connectionRoutes.post("/connections/accept-proxy-invite", auth, acceptProxyInvite);

@@ -91,6 +91,15 @@ const connectionSchema = new mongoose.Schema(
       enum: ["invited", "pending", "active", "disabled", "rejected", "cancelled"],
       default: "invited",
     },
+    cancelledAt: {
+      type: Date,
+      default: null,
+    },
+    cancelledBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
     releaseStatus: {
       type: String,
       enum: ["established", "pending-release", "released", "rejected"],
