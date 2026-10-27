@@ -597,21 +597,28 @@ export const handlePaymentFailed = async (invoice: Stripe.Invoice) => {
 };
 
 // Create a billing portal session for the user to manage their subscription.
-export const createBillingPortalSession = async (userId: string) => {
-  const user = await User.findById(userId).select("+stripeCustomerId");
+export const createBillingPortalSession = async (
+  userId: string,
+) => {
+  const user = await User.findById(userId)
+    .select("+stripeCustomerId");
 
   if (!user) {
-    throw new AppError(StatusCodes.NOT_FOUND, "User not found");
+    throw new AppError(
+      StatusCodes.NOT_FOUND,
+      "User not found",
+    );
   }
 
   const restriction = await assertUserNotRestricted(userId);
 
-    if (!restriction.allowed) {
-      return {
-        status: "failed",
-        message: restriction.message,
-      };
-    }
+  if (!restriction.allowed) {
+    throw new AppError(
+      StatusCodes.FORBIDDEN,
+      restriction.message ||
+        "Billing changes are unavailable for this account.",
+    );
+  }
 
   if (!user.stripeCustomerId) {
     throw new AppError(
@@ -620,10 +627,11 @@ export const createBillingPortalSession = async (userId: string) => {
     );
   }
 
-  const portalSession = await stripe.billingPortal.sessions.create({
-    customer: user.stripeCustomerId,
-    return_url: `${config.frontend_url}/account`,
-  });
+  const portalSession =
+    await stripe.billingPortal.sessions.create({
+      customer: user.stripeCustomerId,
+      return_url: `${config.frontend_url}/account`,
+    });
 
   return {
     url: portalSession.url,

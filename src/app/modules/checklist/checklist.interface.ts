@@ -5,14 +5,14 @@ export type ChecklistStatus = "pending" | "in-progress" | "done";
 
 export interface ChecklistItem {
   title: string;
-  category: "financial" | "medical" | "legal" | "digital" | "personal";
+  category: "financial" | "medical" | "legal" | "digital" | "personal" | "pets" | "homeAuto";
   instructions: string;
   status: ChecklistStatus;
 }
 
 export interface CHECKLIST {
   title: string;
-  category: "financial" | "medical" | "legal" | "digital" | "personal";
+  category: "financial" | "medical" | "legal" | "digital" | "personal" | "pets" | "homeAuto";
   instructions: string;
   status: ChecklistStatus;
   userID: string;
