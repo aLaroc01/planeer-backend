@@ -248,7 +248,7 @@ app.use("/api/v1", digitalRoutes);
 app.use("/api/v1/audit-logs", AuditLogRoutes);
 app.use("/api/v1", SupportRoutes);
 app.use("/api/v1", ChecklistRoutes);
-app.use("api/v1", SupportRequestRoutes);
+app.use("/api/v1", SupportRequestRoutes);
 
 /*
 |--------------------------------------------------------------------------
