@@ -58,7 +58,6 @@ export const sendSupportRequestAcknowledgment = async (
       recipientEmail,
       subject,
       text,
-      html,
     );
 
     console.info(
