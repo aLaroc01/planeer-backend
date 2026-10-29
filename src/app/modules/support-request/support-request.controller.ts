@@ -4,6 +4,9 @@ import {
   SupportRequest,
   SUPPORT_ISSUES,
 } from "./support-request.model";
+import {
+  sendSupportRequestAcknowledgment,
+} from "../../../helpers/supportRequestAcknowledgment";
 
 export const createSupportRequest = async (
   req: Request,
@@ -57,6 +60,17 @@ export const createSupportRequest = async (
       issue,
       message,
     });
+
+    try {
+      await sendSupportRequestAcknowledgment(
+        email,
+      );
+    } catch (emailError) {
+      console.error(
+        "Support request saved, but acknowledgment email failed:",
+        emailError,
+      );
+    }
 
     return res.status(201).json({
       success: true,
