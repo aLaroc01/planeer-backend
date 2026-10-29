@@ -6,7 +6,7 @@ export const sendSupportRequestAcknowledgment = async (
 ) => {
   
   const logoUrl =
-    "https://planeer-frontend.vercel.app/planeer-logo.png";
+    "https://planeer-frontend.vercel.app/images/planeer-logo.png";
 
   const subject = "We've received your inquiry — Planeer";
 
@@ -17,25 +17,6 @@ export const sendSupportRequestAcknowledgment = async (
       width="160"
       style="display:block; width:160px; max-width:100%; height:auto; border:0;"
     />
-    <br /><br />
-
-    Hello,
-    <br /><br />
-
-    Thank you for contacting Planeer.
-    <br /><br />
-
-    We've received your inquiry. Our team will review it and
-    contact you at this email address as soon as possible.
-    <br /><br />
-
-    This is an automated acknowledgment confirming receipt
-    of your message, not a resolution of your inquiry.
-    <br /><br />
-
-    Thank you,
-    <br />
-    The Planeer Team
   `;
 
   const text = [
