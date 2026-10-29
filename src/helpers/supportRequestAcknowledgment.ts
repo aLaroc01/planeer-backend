@@ -38,10 +38,26 @@ export const sendSupportRequestAcknowledgment = async (
     The Planeer Team
   `;
 
+  const text = [
+    "Hello,",
+    "",
+    "Thank you for contacting Planeer.",
+    "",
+    "We've received your inquiry. Our team will review it and " +
+      "contact you at this email address as soon as possible.",
+    "",
+    "This is an automated acknowledgment confirming receipt " +
+      "of your message, not a resolution of your inquiry.",
+    "",
+    "Thank you,",
+    "The Planeer Team",
+  ].join("\n");
+
   try {
     const result = await SendEmail(
       recipientEmail,
       subject,
+      text,
       html,
     );
 
