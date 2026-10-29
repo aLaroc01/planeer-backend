@@ -62,12 +62,20 @@ export const createSupportRequest = async (
     });
 
     try {
-      await sendSupportRequestAcknowledgment(
-        email,
+      console.info(
+        "[support acknowledgment] Starting send",
+        { requestId: String(request._id) },
+      );
+
+      await sendSupportRequestAcknowledgment(email);
+
+      console.info(
+        "[support acknowledgment] Email helper completed",
+        { requestId: String(request._id) },
       );
     } catch (emailError) {
       console.error(
-        "Support request saved, but acknowledgment email failed:",
+        "[support acknowledgment] Email send failed:",
         emailError,
       );
     }
