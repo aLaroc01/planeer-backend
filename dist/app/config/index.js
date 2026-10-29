@@ -24,10 +24,10 @@ exports.config = {
     },
     // ✅ email config এখানে add করো
     email: {
-        header_name: process.env.EMAIL_HEADER_NAME,
-        from: process.env.EMAIL_FROM,
-        domain: process.env.EMAIL_DOMAIN,
-        api_key: process.env.EMAIL_API_KEY,
+        header_name: process.env.MAILGUN_HEADER_NAME,
+        from: process.env.MAILGUN_FROM,
+        domain: process.env.MAILGUN_DOMAIN,
+        api_key: process.env.MAILGUN_API_KEY,
     },
 };
 //mongodb+srv://rkrafikridoy5887_db_user:ooVS91rbk62V05ZN@arron-backend-project.fodvybr.mongodb.net/?appName=arron-backend-project
