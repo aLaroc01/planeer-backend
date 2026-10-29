@@ -145,7 +145,10 @@ export const completeSupportRequest = async (
 ) => {
   try {
     const id = req.params.id;
-    const adminId = req.user?.id;
+    const rawAdminId = req.user?.id;
+
+    const adminId =
+      req.user?.id == null ? "" : String(req.user.id);
 
     if (
       typeof adminId !== "string" ||

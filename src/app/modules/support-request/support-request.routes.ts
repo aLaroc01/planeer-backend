@@ -1,15 +1,6 @@
 import { Router } from "express";
-
-import {
-  auth,
-  isAdminOrSuperAdmin,
-} from "../../middleware/auth.middleware";
-
-import {
-  createSupportRequest,
-  listSupportRequests,
-  completeSupportRequest,
-} from "./support-request.controller";
+import { auth, isAdminOrSuperAdmin, } from "../../middleware/auth.middleware";
+import { createSupportRequest, listSupportRequests, completeSupportRequest, } from "./support-request.controller";
 
 const router = Router();
 
