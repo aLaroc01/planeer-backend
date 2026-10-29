@@ -11,9 +11,17 @@ interface AuthenticatedRequest extends Request {
 
 
 
-export const auth= async(req:AuthenticatedRequest, res:Response, next:NextFunction) => {
+export const auth = async(req:AuthenticatedRequest, res:Response, next:NextFunction) => {
   try {
-      const token = req.headers.authorization?.split(" ")[1];
+      const authorization = req.headers.authorization;
+      const token = authorization?.split(" ")[1];
+
+      console.debug("[auth request]", {
+        method: req.method,
+        path: req.originalUrl,
+        hasAuthorizationHeader: Boolean(authorization),
+        hasExtractedToken: Boolean(token),
+      });
 
   if (!token) {
     return res.status(401).json({ message: "Unauthorized access" });
