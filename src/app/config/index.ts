@@ -8,7 +8,7 @@ export const config = {
   jwt_secret: process.env.JWT_SECRET,
   stripe_secret_key:process.env.STRIPE_SECRET_KEY,
   //copy
-   frontend_url: process.env.FONTEND_URL,
+   frontend_url: process.env.FRONTEND_URL,
    backend_url: process.env.BACKEND_URL,
   //copy 
      stripe: {
