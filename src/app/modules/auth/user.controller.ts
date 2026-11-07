@@ -3,7 +3,7 @@ import { adminDeleteUserService, adminEmailService, adminLoginService, adminUpda
    getAllOwnUserDataService, getAllUserDataService,  getallUsers, getCountsService, getNewUsersLast10DaysService, getprofileService, 
    getProxysetData, getUsersWhoAddedMeAsProxyService, getUsersWhoSetMyProxyService,LoginInUser,  ProxysetService, searchUsersService,  
    updatePassword, updateUserService, UserAnalysisService, userSelfUpdateService, } from "./user.service";
-import { PlanStatus } from "./user.interface";
+import { PlanStatus, Role } from "./user.interface";
 import { checkActiveSubscription } from "../subscriptions-information/subscriptions.service";
 import { User } from "./user.model";
 import { logSuccess } from "../../../helpers/successLogger";
@@ -420,11 +420,6 @@ export const forgetPassword = async (req: Request, res: Response, next: NextFunc
 
 
 
-
-
-
-
-
 // Admin retrieves a list of users with pagination and search functionality
 export const UserList = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -432,7 +427,10 @@ export const UserList = async (req: Request, res: Response): Promise<void> => {
     const perPage = Number(req.query.perPage) || 10;
     const searchKeyword = (req.query.searchKeyword as string) || "";
 
-    let matchStage: any = {};
+    const matchStage =
+      req.user?.role === Role.ADMIN
+        ? { role: { $ne: Role.SUPER_ADMIN } }
+        : {};
     let addFieldsStage: any = {};
 
     if (searchKeyword && searchKeyword !== "0") {
@@ -459,9 +457,10 @@ export const UserList = async (req: Request, res: Response): Promise<void> => {
       addFieldsStage = { isMatched: 0 };
     }
 
-    const total = await User.countDocuments();
+    const total = await User.countDocuments(matchStage);
 
     const users = await User.aggregate([
+      { $match: matchStage },
       { $addFields: addFieldsStage },
       { $sort: { isMatched: -1, createdAt: -1 } },
       { $skip: (pageNo - 1) * perPage },
@@ -485,11 +484,6 @@ export const UserList = async (req: Request, res: Response): Promise<void> => {
     });
   }
 };
-
-
-
-
-
 
 
 
