@@ -1059,11 +1059,12 @@ export const updateUserService = async (req:Request) => { //this is different
 
 
 
-export const adminUpdateUserService = async (req: Request) => { // checked this
+export const adminUpdateUserService = async (req: Request) => {
   try {
     const adminId = req.user?.id;
     const adminRole = req.user?.role;
     const userId = req.params.id;
+    const body = req.body ?? {};
 
     if (!adminId) {
       return {
@@ -1098,76 +1099,73 @@ export const adminUpdateUserService = async (req: Request) => { // checked this
       };
     }
 
-    // Only super admins can modify an already-deactivated account.
-    if (!isSuperAdmin && user.accountStatus === AccountStatus.DEACTIVATED) {
-      return {
-        status: "failed",
-        message: "Only a super admin can modify a deactivated account",
-      };
-    }
-
-    // Only super admins can deactivate an account.
-    if (
-      !isSuperAdmin &&
-      req.body.accountStatus === AccountStatus.DEACTIVATED
-    ) {
-      return {
-        status: "failed",
-        message: "Only a super admin can deactivate an account",
-      };
-    }
-
-    // Only super admins can submit role changes.
-    if (!isSuperAdmin && req.body.role !== undefined) {
-      return {
-        status: "failed",
-        message: "Only a super admin can change user roles",
-      };
-    }
-
-    const allowedAccountStatuses = [
-      AccountStatus.ACTIVE,
-      AccountStatus.SUSPENDED,
-      AccountStatus.PENDING_VERIFICATION,
-      AccountStatus.DEACTIVATED,
-    ];
-
-    const allowedRoles = [
-      Role.USER,
-      Role.PROXY,
-      Role.ADMIN,
-      Role.SUPER_ADMIN,
-    ];
-
     const updates: Record<string, string> = {};
 
-    if (typeof req.body.phoneNumber === "string") {
-      updates.phoneNumber = req.body.phoneNumber.trim();
-    }
-
-    if (req.body.accountStatus !== undefined) {
-      if (!allowedAccountStatuses.includes(req.body.accountStatus)) {
+    // Routine status changes only.
+    if (body.accountStatus !== undefined) {
+      if (
+        body.accountStatus !== AccountStatus.ACTIVE &&
+        body.accountStatus !== AccountStatus.PENDING_VERIFICATION
+      ) {
         return {
           status: "failed",
-          message: "Invalid account status",
+          message:
+            "This endpoint only supports ACTIVE or PENDING_VERIFICATION",
         };
       }
 
-      updates.accountStatus = req.body.accountStatus;
+      // Prevent bypassing the separate restriction-management action.
+      if (
+        user.accountStatus === AccountStatus.SUSPENDED ||
+        user.accountStatus === AccountStatus.DEACTIVATED
+      ) {
+        return {
+          status: "failed",
+          message:
+            "Use the separate super-admin action to change a suspended or deactivated account",
+        };
+      }
+
+      updates.accountStatus = body.accountStatus;
     }
 
-    if (req.body.role !== undefined) {
-      if (!allowedRoles.includes(req.body.role)) {
+    if (body.phoneNumber !== undefined) {
+      if (typeof body.phoneNumber !== "string") {
+        return {
+          status: "failed",
+          message: "Phone number must be a string",
+        };
+      }
+
+      updates.phoneNumber = body.phoneNumber.trim();
+    }
+
+    // Role changes remain super-admin-only.
+    if (body.role !== undefined) {
+      if (!isSuperAdmin) {
+        return {
+          status: "failed",
+          message: "Only a super admin can change user roles",
+        };
+      }
+
+      const allowedRoles = [
+        Role.USER,
+        Role.PROXY,
+        Role.ADMIN,
+        Role.SUPER_ADMIN,
+      ];
+
+      if (!allowedRoles.includes(body.role)) {
         return {
           status: "failed",
           message: "Invalid role",
         };
       }
 
-      // Prevent a super admin from accidentally removing their own access.
       if (
-        userId === adminId &&
-        req.body.role !== Role.SUPER_ADMIN
+        String(userId) === String(adminId) &&
+        body.role !== Role.SUPER_ADMIN
       ) {
         return {
           status: "failed",
@@ -1175,7 +1173,7 @@ export const adminUpdateUserService = async (req: Request) => { // checked this
         };
       }
 
-      updates.role = req.body.role;
+      updates.role = body.role;
     }
 
     if (Object.keys(updates).length === 0) {
@@ -1196,9 +1194,9 @@ export const adminUpdateUserService = async (req: Request) => { // checked this
       {
         new: true,
         runValidators: true,
-      }
+      },
     ).select(
-      "_id email phoneNumber role accountStatus planStatus lastLoginAt mfa.enabled createdAt updatedAt"
+      "_id email phoneNumber role accountStatus planStatus lastLoginAt mfa.enabled createdAt updatedAt",
     );
 
     if (!updatedUser) {
@@ -1208,57 +1206,47 @@ export const adminUpdateUserService = async (req: Request) => { // checked this
       };
     }
 
-    const changedFields = Object.keys(updates);
-
     const roleChanged =
-      updates.role !== undefined && updates.role !== before.role;
+      updates.role !== undefined &&
+      updates.role !== before.role;
 
     const accountStatusChanged =
       updates.accountStatus !== undefined &&
       updates.accountStatus !== before.accountStatus;
 
-    console.log("Creating audit log...", {
-        actorId: adminId,
-        targetUserId: userId,
-        changedFields,
-      });
-
-      const auditLog = await AuditLog.create({
-        actorId: adminId,
-        targetUserId: userId,
-        action: roleChanged
-          ? AuditAction.USER_ROLE_CHANGED
-          : accountStatusChanged
+    await AuditLog.create({
+      actorId: adminId,
+      targetUserId: userId,
+      action: roleChanged
+        ? AuditAction.USER_ROLE_CHANGED
+        : accountStatusChanged
           ? AuditAction.USER_STATUS_CHANGED
           : AuditAction.USER_UPDATED,
-        changedFields,
-        before: {
-          role: before.role,
-          accountStatus: before.accountStatus,
-        },
-        after: {
-          role: updatedUser.role,
-          accountStatus: updatedUser.accountStatus,
-        },
-      });
+      changedFields: Object.keys(updates),
+      before: {
+        role: before.role,
+        accountStatus: before.accountStatus,
+      },
+      after: {
+        role: updatedUser.role,
+        accountStatus: updatedUser.accountStatus,
+      },
+    });
 
-      console.log("Audit log saved:", auditLog._id.toString());
-
-      return {
-        status: "success",
-        message: "User updated successfully.",
-        data: updatedUser,
-      };
-
+    return {
+      status: "success",
+      message: "User updated successfully.",
+      data: updatedUser,
+    };
   } catch (error: any) {
+    console.error("adminUpdateUserService error:", error);
+
     return {
       status: "failed",
-      message: error.message,
+      message: error?.message || "Failed to update user",
     };
   }
 };
-
-
 
 
 
