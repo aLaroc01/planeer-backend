@@ -50,7 +50,7 @@ const medical_model_1 = require("../../modules/medical-Information/medical.model
 const homeauto_model_1 = require("../homeAuto-Information/homeauto.model");
 const personal_model_1 = require("../../modules/personal-Information/personal.model");
 const profile_model_1 = require("../Profile-Information/profile.model");
-const digital_model_1 = require("../../modules/digital-Information/digital.model");
+const digital_model_1 = require("../digital-Information/digital.model");
 const user_interface_1 = require("./user.interface");
 const auditLog_model_1 = require("../audit-log/auditLog.model");
 const auditLog_interface_1 = require("../audit-log/auditLog.interface");
@@ -86,15 +86,6 @@ const existingUser = async (body) => {
         "phoneNumber",
         "imgUrl"
     ];
-    const filledFields = FIELDS.filter(field => {
-        const value = body[field];
-        if (!value)
-            return false;
-        if (typeof value === "string" && value.trim() === "")
-            return false;
-        return true;
-    }).length;
-    // const userPercentage = Math.round((filledFields / FIELDS.length) * 100);
     // Create new user with calculated percentage
     const newUser = new user_model_1.User({
         ...body,
@@ -260,7 +251,8 @@ const userSelfUpdateService = async (req) => {
             updateData.email = req.body.email.toLowerCase();
         if (req.body.phoneNumber !== undefined)
             updateData.phoneNumber = req.body.phoneNumber;
-        // if (req.body.imgUrl !== undefined) updateData.imgUrl = req.body.imgUrl;
+        if (req.body.imgUrl !== undefined)
+            updateData.imgUrl = req.body.imgUrl;
         // const uploadedFile = (req as any).file;
         // if (uploadedFile?.path) {
         //   updateData.imgUrl = uploadedFile.path;
@@ -280,16 +272,6 @@ const userSelfUpdateService = async (req) => {
             updateData.phoneNumber,
             updateData.imgUrl,
         ];
-        const filledFields = fields.filter((field) => {
-            if (field === undefined || field === null)
-                return false;
-            if (typeof field === "string")
-                return field.trim() !== "";
-            return true;
-        }).length;
-        const totalFields = fields.length;
-        const userPercentage = Math.round((filledFields / totalFields) * 100);
-        updateData.userPercentage = userPercentage;
         const updatedUser = await user_model_1.User.findByIdAndUpdate(userId, { $set: updateData }, { new: true }).select("-password");
         if (!updatedUser) {
             return { status: "failed", message: "User not found" };
@@ -298,7 +280,6 @@ const userSelfUpdateService = async (req) => {
             status: "success",
             message: "Profile updated successfully",
             data: updatedUser,
-            userPercentage,
         };
     }
     catch (error) {
@@ -531,10 +512,6 @@ const getUserFullProfileService = async (userId) => {
                 _id: 0,
                 name: 1,
                 email: 1,
-                // financialPercentage: { $arrayElemAt: ["$financialInfo.financialPercentage", 0] },
-                // digitalInfo: { $arrayElemAt: ["$digitalInfo.digitalInfoPercentage", 0] },
-                // homeAutoInfo: { $arrayElemAt: ["$homeAutoInfo.homeautoPercentage", 0] },
-                // medicalsInfo: { $arrayElemAt: ["$medicalsInfo.medicalsPercentage", 0] },
             },
         },
     ]);
@@ -556,67 +533,6 @@ const getAllOwnUserDataService = async (loggedInUserId) => {
     ]);
 };
 exports.getAllOwnUserDataService = getAllOwnUserDataService;
-// 🔢 Calculate percentages
-// const homeautoPercentage = homeauto.reduce(
-//   (sum, item) => sum + (item.homeautoPercentage || 0),
-//   0
-// );
-// const medicalPercentage = medical.reduce(
-//   (sum, item) => sum + (item.medicalsPercentage || 0),
-//   0
-// );
-// const financialPercentage = financial.reduce(
-//   (sum, item) => sum + (item.financialPercentage || 0),
-//   0
-// );
-// const digitalInfoPercentage = digitalInfo.reduce(
-//   (sum, item) => sum + (item.digitalInfoPercentage || 0),
-//   0
-// );
-// userPercentage runtime only
-// const userPercentage = user.userPercentage || 0;
-// const totalPercentage =
-//   homeautoPercentage +
-//   medicalPercentage +
-//   financialPercentage +
-//   digitalInfoPercentage; 
-// + userPercentage;
-// 💡 Suggestion logic (3 suggestions for every case)
-// let suggestions: string[] = [];
-// if (totalPercentage === 100) {
-//   suggestions = [
-//     "Profile is fully completed",
-//     "You can now access all features without any limitation",
-//     "Keep your profile updated for better experience"
-//   ];
-// } else if (totalPercentage >= 71) {
-//   suggestions = [
-//     "Your profile is almost completed",
-//     "Complete remaining sections to reach 100%",
-//     "Review and submit missing information"
-//   ];
-// } else if (totalPercentage >= 41) {
-//   suggestions = [
-//     "Your profile is partially completed",
-//     "Add more information to improve profile strength",
-//     "Completing all sections helps better service"
-//   ];
-// } else {
-//   suggestions = [
-//     "Your profile is very incomplete",
-//     "Please start adding your personal information",
-//     "Completing your profile unlocks more features"
-//   ];
-// }
-// return { user,homeauto, medical, financial,digitalInfo , percentages: {
-//   homeautoPercentage,
-//   medicalPercentage,
-//   financialPercentage,
-//   digitalInfoPercentage,
-//   // userPercentage,
-//   totalPercentage
-// }, suggestions };
-// };
 const getAllUserDataService = async (requestedUserId, loggedInUserId) => {
     const user = await user_model_1.User.findById(requestedUserId);
     if (!user)
@@ -909,10 +825,12 @@ const adminUpdateUserService = async (req) => {
                 message: "Unauthorized",
             };
         }
-        if (adminRole !== user_interface_1.Role.SUPER_ADMIN) {
+        const isSuperAdmin = adminRole === user_interface_1.Role.SUPER_ADMIN;
+        const isAdmin = adminRole === user_interface_1.Role.ADMIN;
+        if (!isAdmin && !isSuperAdmin) {
             return {
                 status: "failed",
-                message: "Only a super admin can update users",
+                message: "Only admins and super admins can update users",
             };
         }
         if (!userId) {
@@ -926,6 +844,28 @@ const adminUpdateUserService = async (req) => {
             return {
                 status: "failed",
                 message: "User not found",
+            };
+        }
+        // Only super admins can modify an already-deactivated account.
+        if (!isSuperAdmin && user.accountStatus === user_interface_1.AccountStatus.DEACTIVATED) {
+            return {
+                status: "failed",
+                message: "Only a super admin can modify a deactivated account",
+            };
+        }
+        // Only super admins can deactivate an account.
+        if (!isSuperAdmin &&
+            req.body.accountStatus === user_interface_1.AccountStatus.DEACTIVATED) {
+            return {
+                status: "failed",
+                message: "Only a super admin can deactivate an account",
+            };
+        }
+        // Only super admins can submit role changes.
+        if (!isSuperAdmin && req.body.role !== undefined) {
+            return {
+                status: "failed",
+                message: "Only a super admin can change user roles",
             };
         }
         const allowedAccountStatuses = [
@@ -1018,6 +958,11 @@ const adminUpdateUserService = async (req) => {
             },
         });
         console.log("Audit log saved:", auditLog._id.toString());
+        return {
+            status: "success",
+            message: "User updated successfully.",
+            data: updatedUser,
+        };
     }
     catch (error) {
         return {
@@ -1029,60 +974,70 @@ const adminUpdateUserService = async (req) => {
 exports.adminUpdateUserService = adminUpdateUserService;
 const getCountsService = async (req) => {
     try {
-        const days = Number(req.query.days) || 30;
-        // Last N days
-        const nDaysAgo = new Date();
-        nDaysAgo.setDate(nDaysAgo.getDate() - days);
-        // Last Month Range
-        const startOfLastMonth = new Date();
-        startOfLastMonth.setMonth(startOfLastMonth.getMonth() - 1, 1);
-        startOfLastMonth.setHours(0, 0, 0, 0);
-        const endOfLastMonth = new Date();
-        endOfLastMonth.setDate(0);
-        endOfLastMonth.setHours(23, 59, 59, 999);
-        // Current month range
-        const startOfThisMonth = new Date();
-        startOfThisMonth.setDate(1);
-        startOfThisMonth.setHours(0, 0, 0, 0);
-        const endOfThisMonth = new Date();
-        endOfThisMonth.setHours(23, 59, 59, 999);
-        const [totalUsers, newUsersLastNDays, lastMonthUsers, currentMonthUsers, totalReports] = await Promise.all([
+        const now = new Date();
+        const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+        const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
+        const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+        const [totalUsers, activeUsers, newUsersThisMonth, newUsersLastMonth, activeUsersLastMonth, inactiveUsersLastMonth, totalReports,] = await Promise.all([
             user_model_1.User.countDocuments(),
-            user_model_1.User.countDocuments({ createdAt: { $gte: nDaysAgo } }),
+            user_model_1.User.countDocuments({ accountStatus: "ACTIVE" }),
             user_model_1.User.countDocuments({
-                createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth }
+                createdAt: {
+                    $gte: startOfThisMonth,
+                    $lte: now,
+                },
             }),
             user_model_1.User.countDocuments({
-                createdAt: { $gte: startOfThisMonth, $lte: endOfThisMonth }
+                createdAt: {
+                    $gte: startOfLastMonth,
+                    $lte: endOfLastMonth,
+                },
             }),
-            report_model_1.ReportModel.countDocuments()
+            user_model_1.User.countDocuments({
+                accountStatus: "ACTIVE",
+                createdAt: {
+                    $gte: startOfLastMonth,
+                    $lte: endOfLastMonth,
+                },
+            }),
+            user_model_1.User.countDocuments({
+                accountStatus: { $ne: "ACTIVE" },
+                createdAt: {
+                    $gte: startOfLastMonth,
+                    $lte: endOfLastMonth,
+                },
+            }),
+            report_model_1.ReportModel.countDocuments(),
         ]);
+        const inactiveUsers = totalUsers - activeUsers;
         const calculatePercentage = (current, previous) => {
-            if (previous === 0)
-                return 100;
-            return ((current - previous) / previous) * 100;
+            if (previous === 0) {
+                return current > 0 ? 100 : 0;
+            }
+            return Number((((current - previous) / previous) * 100).toFixed(2));
         };
-        const newUsersPercent = parseFloat(calculatePercentage(newUsersLastNDays, lastMonthUsers).toFixed(2));
-        const activeUsersPercent = parseFloat(calculatePercentage(currentMonthUsers, lastMonthUsers).toFixed(2));
-        // Example: inactive users = total - active
-        const inactiveUsers = totalUsers - currentMonthUsers;
-        const inactiveUsersPercent = parseFloat(calculatePercentage(inactiveUsers, lastMonthUsers - currentMonthUsers).toFixed(2));
+        const newUsersPercent = calculatePercentage(newUsersThisMonth, newUsersLastMonth);
+        const activeUsersPercent = calculatePercentage(activeUsers, activeUsersLastMonth);
+        const inactiveUsersPercent = calculatePercentage(inactiveUsers, inactiveUsersLastMonth);
         return {
             status: true,
             data: {
                 totalUsers,
-                newUsersLastNDays,
-                newUsersPercent,
-                currentMonthUsers,
-                activeUsersPercent,
+                activeUsers,
                 inactiveUsers,
+                newUsers: newUsersThisMonth,
+                newUsersPercent,
+                activeUsersPercent,
                 inactiveUsersPercent,
-                totalReports
-            }
+                totalReports,
+            },
         };
     }
     catch (error) {
-        return { status: false, data: error };
+        return {
+            status: false,
+            data: error,
+        };
     }
 };
 exports.getCountsService = getCountsService;

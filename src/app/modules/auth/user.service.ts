@@ -1041,7 +1041,7 @@ export const getNewUsersLast10DaysService = async () => {
 
 
 
-export const updateUserService = async (req:Request) => {
+export const updateUserService = async (req:Request) => { //this is different
   try {
        let user_id=req.params.id;
         let requestBody = req.body;
@@ -1059,7 +1059,7 @@ export const updateUserService = async (req:Request) => {
 
 
 
-export const adminUpdateUserService = async (req: Request) => {
+export const adminUpdateUserService = async (req: Request) => { // checked this
   try {
     const adminId = req.user?.id;
     const adminRole = req.user?.role;
@@ -1072,10 +1072,13 @@ export const adminUpdateUserService = async (req: Request) => {
       };
     }
 
-    if (adminRole !== Role.SUPER_ADMIN) {
+    const isSuperAdmin = adminRole === Role.SUPER_ADMIN;
+    const isAdmin = adminRole === Role.ADMIN;
+
+    if (!isAdmin && !isSuperAdmin) {
       return {
         status: "failed",
-        message: "Only a super admin can update users",
+        message: "Only admins and super admins can update users",
       };
     }
 
@@ -1092,6 +1095,33 @@ export const adminUpdateUserService = async (req: Request) => {
       return {
         status: "failed",
         message: "User not found",
+      };
+    }
+
+    // Only super admins can modify an already-deactivated account.
+    if (!isSuperAdmin && user.accountStatus === AccountStatus.DEACTIVATED) {
+      return {
+        status: "failed",
+        message: "Only a super admin can modify a deactivated account",
+      };
+    }
+
+    // Only super admins can deactivate an account.
+    if (
+      !isSuperAdmin &&
+      req.body.accountStatus === AccountStatus.DEACTIVATED
+    ) {
+      return {
+        status: "failed",
+        message: "Only a super admin can deactivate an account",
+      };
+    }
+
+    // Only super admins can submit role changes.
+    if (!isSuperAdmin && req.body.role !== undefined) {
+      return {
+        status: "failed",
+        message: "Only a super admin can change user roles",
       };
     }
 
@@ -1214,7 +1244,11 @@ export const adminUpdateUserService = async (req: Request) => {
 
       console.log("Audit log saved:", auditLog._id.toString());
 
-    
+      return {
+        status: "success",
+        message: "User updated successfully.",
+        data: updatedUser,
+      };
 
   } catch (error: any) {
     return {

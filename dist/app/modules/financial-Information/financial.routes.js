@@ -7,9 +7,11 @@ exports.financialRoutes = void 0;
 const express_1 = __importDefault(require("express"));
 const auth_middleware_1 = require("./../../middleware/auth.middleware");
 const financial_controller_1 = require("./financial.controller");
+const requireEntitledGrantor_1 = require("./../../middleware/requireEntitledGrantor");
 const router = express_1.default.Router();
 // create Financial Information 
-router.post("/CreateFinancial", auth_middleware_1.auth, financial_controller_1.UpdateFinancial);
-router.post("/UpdateFinancial", auth_middleware_1.auth, financial_controller_1.UpdateFinancial);
-router.get("/GetFinancialData", auth_middleware_1.auth, financial_controller_1.GetFinancialData);
+router.post("/CreateFinancial", auth_middleware_1.auth, requireEntitledGrantor_1.requireEntitledGrantor, financial_controller_1.UpdateFinancial);
+router.post("/UpdateFinancial", auth_middleware_1.auth, requireEntitledGrantor_1.requireEntitledGrantor, financial_controller_1.UpdateFinancial);
+router.get("/GetFinancialData", auth_middleware_1.auth, requireEntitledGrantor_1.requireEntitledGrantor, financial_controller_1.GetFinancialData);
+router.get("/GetFinancialForProxy/:grantorId", auth_middleware_1.auth, financial_controller_1.GetFinancialForProxy);
 exports.financialRoutes = router;

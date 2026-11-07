@@ -89,7 +89,7 @@ router.get("/pagenationlist", auth, isAdminOrSuperAdmin, UserList);
 router.get("/new-user-last", auth, isAdminOrSuperAdmin, getNewUsersLast10Days);
 
 // Update User by Admin
-router.put("/updateUser/:id",auth, isAdminOrSuperAdmin, updateUserController)
+// router.put("/updateUser/:id",auth, isAdminOrSuperAdmin, updateUserController)
 
 // User Analysis
 router.get("/users/analysis", auth, isAdminOrSuperAdmin, UserAnalysisController.getAnalysis);
@@ -100,7 +100,7 @@ router.get("/counts-user-report", auth, isAdminOrSuperAdmin, getCounts);
 router.delete("/deleteUser/:id", auth, isAdminOrSuperAdmin, adminDeleteUser);
 
 // User Profile Update
-router.put("/adminUpdateUser/:id", auth, isAdminOrSuperAdmin,adminUpdateUser)
+router.put("/adminUpdateUser/:id", auth, isAdminOrSuperAdmin, adminUpdateUser)
 
 // system performance api 
 router.get("/performance",auth, isAdminOrSuperAdmin, getSystemPerformance);

@@ -3,8 +3,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.adminUpdateUser = exports.getSystemPerformance = exports.adminLoginController = exports.getUsersWhoSetMyProxy = exports.getUsersWhoAddedMeAsProxyController = exports.getAllUserDataController = exports.getAllOwnUserDataController = exports.UserAnalysisController = exports.getCounts = exports.updateUserController = exports.getNewUsersLast10Days = exports.UserList = exports.forgetPassword = exports.codeverify = exports.AdminEmail = exports.getAllProxysetController = exports.ProxysetController = exports.searchUsersController = exports.GetAllProfile = exports.adminDeleteUser = exports.userSelfUpdate = exports.GetProfileData = exports.loginUser = exports.registerUser = void 0;
+exports.adminUpdateUser = exports.getSystemPerformance = exports.adminLoginController = exports.getUsersWhoSetMyProxy = exports.getUsersWhoAddedMeAsProxyController = exports.getAllUserDataController = exports.getAllOwnUserDataController = exports.UserAnalysisController = exports.getCounts = exports.updateUserController = exports.getNewUsersLast10Days = exports.UserList = exports.forgetPassword = exports.codeverify = exports.AdminEmail = exports.getAllProxysetController = exports.ProxysetController = exports.searchUsersController = exports.GetAllProfile = exports.adminDeleteUser = exports.userSelfUpdate = exports.GetProfileData = exports.getAccountStatus = exports.loginUser = exports.registerUser = void 0;
 const user_service_1 = require("./user.service");
+const user_interface_1 = require("./user.interface");
+const subscriptions_service_1 = require("../subscriptions-information/subscriptions.service");
 const user_model_1 = require("./user.model");
 const successLogger_1 = require("../../../helpers/successLogger");
 const logger_1 = __importDefault(require("../../../helpers/logger"));
@@ -12,6 +14,7 @@ const errorCounter_1 = require("../../../helpers/errorCounter");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const index_1 = require("./../../config/index");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
+// User registration controller
 const registerUser = async (req, res, next) => {
     try {
         const user = await (0, user_service_1.existingUser)(req.body);
@@ -21,15 +24,18 @@ const registerUser = async (req, res, next) => {
         if (!isMatch) {
             throw new Error("Invalid password");
         }
-        const token = jsonwebtoken_1.default.sign({ userId: user._id, role: user.role }, index_1.config.jwt_secret, { expiresIn: "1d" });
-        (0, successLogger_1.logSuccess)(req, "User registered successfully", { userId: user._id, email: user.email });
-        return res.status(201).json({ success: true, message: "User registered successfully", statusCode: 201, data: { _id: user._id, phoneNumber: user.phoneNumber, email: user.email, role: user.role, token: token }, meta: null });
+        const token = jsonwebtoken_1.default.sign({ userId: user._id.toString(),
+            role: user.role,
+        }, index_1.config.jwt_secret, { expiresIn: "1d" });
+        (0, successLogger_1.logSuccess)(req, "User registered successfully", { userId: user._id.toString(), email: user.email });
+        return res.status(201).json({ success: true, message: "User registered successfully", statusCode: 201, data: { _id: user._id.toString(), phoneNumber: user.phoneNumber, email: user.email, role: user.role, token: token }, meta: null });
     }
     catch (error) {
         next(error);
     }
 };
 exports.registerUser = registerUser;
+// User login controller
 const loginUser = async (req, res, next) => {
     try {
         const { email, password } = req.body;
@@ -38,8 +44,8 @@ const loginUser = async (req, res, next) => {
         }
         const { user, token } = await (0, user_service_1.LoginInUser)(email, password);
         // 🔹 Success log
-        (0, successLogger_1.logSuccess)(req, "User logged in successfully", { userId: user._id, email: user.email });
-        return res.status(200).json({ success: true, message: "User logged in successfully", statusCode: 200, data: { _id: user._id, phoneNumber: user.phoneNumber, email: user.email, role: user.role, token: token },
+        (0, successLogger_1.logSuccess)(req, "User logged in successful", { userId: user._id.toString(), email: user.email });
+        return res.status(200).json({ success: true, message: "User logged in successfully", statusCode: 200, data: { _id: user._id.toString(), phoneNumber: user.phoneNumber, email: user.email, role: user.role, token: token },
             meta: null
         });
     }
@@ -48,6 +54,55 @@ const loginUser = async (req, res, next) => {
     }
 };
 exports.loginUser = loginUser;
+// Get the account status of the currently logged-in user
+const getAccountStatus = async (req, res, next) => {
+    try {
+        const userId = req.user?._id;
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                message: "Unauthorized",
+            });
+            return;
+        }
+        const user = await user_model_1.User.findById(userId)
+            .select("role accountStatus planStatus " +
+            "planStatusChangedAt archiveExpiresAt")
+            .lean();
+        if (!user) {
+            res.status(404).json({
+                success: false,
+                message: "User not found",
+            });
+            return;
+        }
+        const planStatus = user.planStatus ?? user_interface_1.PlanStatus.ACTIVE;
+        const subscriptionActive = await (0, subscriptions_service_1.checkActiveSubscription)(userId);
+        const planRestricted = planStatus === user_interface_1.PlanStatus.FROZEN ||
+            planStatus === user_interface_1.PlanStatus.ARCHIVED;
+        res.status(200).json({
+            success: true,
+            message: "Account status retrieved.",
+            data: {
+                role: user.role,
+                // Administrative/verification status:
+                accountStatus: user.accountStatus,
+                // Grantor plan lifecycle:
+                planStatus,
+                planRestricted,
+                planStatusChangedAt: user.planStatusChangedAt ?? null,
+                archiveExpiresAt: user.archiveExpiresAt ?? null,
+                // Eligibility, not yet a role-based restriction:
+                subscriptionActive,
+            },
+        });
+    }
+    catch (error) {
+        return next(error);
+    }
+};
+exports.getAccountStatus = getAccountStatus;
+// Get the profile data of the currently logged-in user
 const GetProfileData = async (req, res, next) => {
     let result = await (0, user_service_1.getprofileService)(req);
     // 🔹 Success log
@@ -55,6 +110,7 @@ const GetProfileData = async (req, res, next) => {
     res.json(result);
 };
 exports.GetProfileData = GetProfileData;
+// User updates their own profile
 const userSelfUpdate = async (req, res) => {
     const result = await (0, user_service_1.userSelfUpdateService)(req);
     if (result?.status === "success") {
@@ -65,6 +121,7 @@ const userSelfUpdate = async (req, res) => {
     res.json(result);
 };
 exports.userSelfUpdate = userSelfUpdate;
+// Admin deletes a user by ID
 const adminDeleteUser = async (req, res) => {
     const result = await (0, user_service_1.adminDeleteUserService)(req);
     if (result.status === "success") {
@@ -76,11 +133,13 @@ const adminDeleteUser = async (req, res) => {
     res.json(result);
 };
 exports.adminDeleteUser = adminDeleteUser;
+// Get the profile data of all users
 const GetAllProfile = async (req, res) => {
     let result = await (0, user_service_1.getallUsers)();
     res.json(result);
 };
 exports.GetAllProfile = GetAllProfile;
+// Admin updates a user's profile
 const searchUsersController = async (req, res, next) => {
     const searchTerm = req.query.searchTerm;
     if (!searchTerm || typeof searchTerm !== "string") {
@@ -104,6 +163,7 @@ const searchUsersController = async (req, res, next) => {
     }
 };
 exports.searchUsersController = searchUsersController;
+// Admin sets a proxy for a user
 const ProxysetController = async (req, res) => {
     const result = await (0, user_service_1.ProxysetService)(req);
     (0, successLogger_1.logSuccess)(req, "Proxy set fetched successfully");
@@ -116,6 +176,7 @@ exports.ProxysetController = ProxysetController;
 //   logSuccess(req, "User updated successfully", { userId: req.user?.id || req.params.id });
 //   return res.json(result);
 // };
+// Admin retrieves all proxy settings for a user
 const getAllProxysetController = async (req, res) => {
     // ✅ Convert id safely
     const idStr = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
@@ -187,6 +248,7 @@ const AdminEmail = async (req, res, next) => {
     }
 };
 exports.AdminEmail = AdminEmail;
+// User verifies an OTP code
 const codeverify = async (req, res, next) => {
     try {
         const { email, otp } = req.body;
@@ -202,6 +264,7 @@ const codeverify = async (req, res, next) => {
     }
 };
 exports.codeverify = codeverify;
+// User resets their password
 const forgetPassword = async (req, res, next) => {
     try {
         const { email, otp, password } = req.body;
@@ -224,6 +287,7 @@ const forgetPassword = async (req, res, next) => {
     }
 };
 exports.forgetPassword = forgetPassword;
+// Admin retrieves a list of users with pagination and search functionality
 const UserList = async (req, res) => {
     try {
         const pageNo = Number(req.query.pageNo) || 1;
@@ -280,6 +344,7 @@ const UserList = async (req, res) => {
     }
 };
 exports.UserList = UserList;
+// Get the count of new users in the last 10 days
 const getNewUsersLast10Days = async (req, res) => {
     try {
         const newUserCount = await (0, user_service_1.getNewUsersLast10DaysService)();
@@ -298,11 +363,13 @@ const getNewUsersLast10Days = async (req, res) => {
     }
 };
 exports.getNewUsersLast10Days = getNewUsersLast10Days;
+// Admin updates a user's profile
 const updateUserController = async (req, res) => {
     let result = await (0, user_service_1.updateUserService)(req);
     res.json(result);
 };
 exports.updateUserController = updateUserController;
+// Get various counts related to users and other entities
 const getCounts = async (req, res) => {
     try {
         const result = await (0, user_service_1.getCountsService)(req);
@@ -318,6 +385,7 @@ const getCounts = async (req, res) => {
     }
 };
 exports.getCounts = getCounts;
+// User analysis controller
 class UserAnalysisController {
     static async getAnalysis(req, res) {
         try {
@@ -354,6 +422,7 @@ exports.UserAnalysisController = UserAnalysisController;
 //     res.status(500).json({ success: false, message: "Server error" });
 //   }
 // };
+// Get all data for the logged-in user
 const getAllOwnUserDataController = async (req, res) => {
     try {
         // ✅ Handle string | string[] safely
@@ -377,6 +446,7 @@ const getAllOwnUserDataController = async (req, res) => {
     }
 };
 exports.getAllOwnUserDataController = getAllOwnUserDataController;
+// Get all data for a specific user by admin
 const getAllUserDataController = async (req, res) => {
     try {
         const { userId } = req.params;
@@ -440,6 +510,7 @@ exports.getAllUserDataController = getAllUserDataController;
 //     res.status(500).json({ success: false, message: "Server error" });
 //   }
 // };
+// Get users who added the logged-in user as a proxy
 const getUsersWhoAddedMeAsProxyController = async (req, res) => {
     try {
         const myUserId = req.user?.id;
@@ -465,6 +536,7 @@ const getUsersWhoAddedMeAsProxyController = async (req, res) => {
     }
 };
 exports.getUsersWhoAddedMeAsProxyController = getUsersWhoAddedMeAsProxyController;
+// Get users for whom the logged-in user has set as a proxy
 const getUsersWhoSetMyProxy = async (req, res) => {
     try {
         const myUserId = req.user?.id;
@@ -498,6 +570,7 @@ const getUsersWhoSetMyProxy = async (req, res) => {
     }
 };
 exports.getUsersWhoSetMyProxy = getUsersWhoSetMyProxy;
+// Admin login controller
 const adminLoginController = async (req, res, next) => {
     try {
         const { email, password } = req.body;
@@ -528,6 +601,7 @@ const adminLoginController = async (req, res, next) => {
     }
 };
 exports.adminLoginController = adminLoginController;
+// Get system performance metrics
 const getSystemPerformance = async (req, res, next) => {
     try {
         const memoryUsage = process.memoryUsage(); // memory info
@@ -578,6 +652,7 @@ const getSystemPerformance = async (req, res, next) => {
     }
 };
 exports.getSystemPerformance = getSystemPerformance;
+// Admin updates a user's profile
 const adminUpdateUser = async (req, res) => {
     const result = await (0, user_service_1.adminUpdateUserService)(req);
     if (result?.status === "success") {

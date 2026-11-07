@@ -23,7 +23,7 @@ exports.UpdateProfile = UpdateProfile;
 const GetProfileData = async (req, res) => {
     try {
         const result = await (0, profile_service_1.ProfileGetService)(req);
-        console.log("here's medical info calls", result);
+        console.log("here's profile info:", result);
         return res.status(result.status === "success" ? 200 : 400).json(result);
     }
     catch (error) {

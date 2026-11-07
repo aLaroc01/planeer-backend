@@ -9,11 +9,30 @@ import { assertUserNotRestricted } from "../../../helpers/accountRestriction";
 import { restoreExpiredArchive } from "../../../helpers/restoreExpiredArchive";
 
 
-export const ProfileCreateService = async (req: Request) => {
-  const userId = req.user?.id;
-  const { data, onboardingType } = req.body;
 
+const PROFILE_UPLOAD_DIR = path.join(
+  process.cwd(),
+  "uploads",
+  "profile-images",
+);
+
+
+export const ProfileCreateService = async (req: Request) => {
   try {
+    const userId = req.user?.id;
+
+    const {
+      firstName,
+      lastName,
+      dateOfBirth,
+      address,
+      city,
+      state,
+      zipcode,
+      phoneNumber,
+      onboardingType,
+    } = req.body;
+
     if (!userId) {
       return {
         status: "failed",
@@ -21,10 +40,10 @@ export const ProfileCreateService = async (req: Request) => {
       };
     }
 
-    if (!data || typeof data !== "object") {
+    if (!firstName?.trim() || !lastName?.trim()) {
       return {
         status: "failed",
-        message: "Profile data is required.",
+        message: "First name and last name are required.",
       };
     }
 
@@ -45,22 +64,65 @@ export const ProfileCreateService = async (req: Request) => {
         : "grantor";
 
     const mainRole: ProfileMainRole =
-      normalizedOnboardingType === "proxy"
-        ? "PROXY"
-        : "GRANTOR";
+      normalizedOnboardingType === "proxy" ? "PROXY" : "GRANTOR";
 
-    const profileCreate = await ProfileModel.create({
-      ...data,
+    const profileData: any = {
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      dateOfBirth: dateOfBirth?.trim() || "",
+      address: address?.trim() || "",
+      city: city?.trim() || "",
+      state: state?.trim() || "",
+      zipcode: zipcode?.trim() || "",
+      phoneNumber: phoneNumber?.trim() || "",
       userID: userId,
       mainRole,
-    });
+    };
+
+    let finalImageUrl = req.body.imgUrl || null;
+
+    const files = (req as any).files;
+
+    if (files?.image) {
+      const file = Array.isArray(files.image)
+        ? files.image[0]
+        : files.image;
+
+      const uploadsDir =
+        process.env.UPLOADS_DIR || path.join(process.cwd(), "uploads");
+
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+
+      const originalName = file.name || "image.png";
+
+      const safeFileName = originalName
+        .replace(/[^a-zA-Z0-9.-]/g, "_")
+        .replace(/_+/g, "_");
+
+      const safeName = `${Date.now()}-${safeFileName}`;
+      const uploadPath = path.join(uploadsDir, safeName);
+
+      await file.mv(uploadPath);
+
+      finalImageUrl = `/uploads/${safeName}`;
+    }
+
+    if (finalImageUrl) {
+      profileData.imgUrl = finalImageUrl;
+    }
+
+    const createdProfile = await ProfileModel.create(profileData);
 
     return {
       status: "success",
       message: "Profile created successfully.",
-      data: profileCreate,
+      data: createdProfile,
     };
   } catch (error: any) {
+    console.error("ProfileCreateService error:", error);
+
     return {
       status: "failed",
       message: error?.message || "Failed to create profile data.",

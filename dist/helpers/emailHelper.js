@@ -9,6 +9,16 @@ const nodemailer_mailgun_transport_1 = __importDefault(require("nodemailer-mailg
 const index_1 = require("../app/config/index");
 const SendEmail = async (EmailTo, EmailSubject, EmailText, EmailHtml) => {
     const { api_key, domain, header_name, from } = index_1.config.email;
+    console.info("[Mailgun runtime configuration]", {
+        domain,
+        from,
+        hasApiKey: Boolean(api_key),
+        apiKeyLength: typeof api_key === "string" ? api_key.length : 0,
+        keyHasOuterWhitespace: typeof api_key === "string" &&
+            api_key !== api_key.trim(),
+        matchesMailgunEnvironmentKey: api_key === process.env.MAILGUN_API_KEY,
+        matchesMailgunEnvironmentDomain: domain === process.env.MAILGUN_DOMAIN,
+    });
     if (!api_key || !domain) {
         throw new Error("Mailgun API key and domain are required");
     }

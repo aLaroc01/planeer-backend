@@ -6,8 +6,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importDefault(require("mongoose"));
 const app_1 = __importDefault(require("./app"));
 const config_1 = require("./app/config");
+const archiveExpiryJob_1 = require("./helpers/archiveExpiryJob");
 async function main() {
     await mongoose_1.default.connect(config_1.config.db_uri);
+    (0, archiveExpiryJob_1.startArchiveExpiryJob)();
     app_1.default.listen(config_1.config.port, () => {
         console.log(`Server is running on port ${config_1.config.port}`);
     });

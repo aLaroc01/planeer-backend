@@ -9,7 +9,6 @@ const connectionSchema = new mongoose_1.default.Schema({
         type: mongoose_1.default.Schema.Types.ObjectId,
         ref: "User",
         required: true,
-        index: true,
     },
     proxyEmail: {
         type: String,
@@ -93,6 +92,15 @@ const connectionSchema = new mongoose_1.default.Schema({
         type: String,
         enum: ["invited", "pending", "active", "disabled", "rejected", "cancelled"],
         default: "invited",
+    },
+    cancelledAt: {
+        type: Date,
+        default: null,
+    },
+    cancelledBy: {
+        type: mongoose_1.default.Schema.Types.ObjectId,
+        ref: "User",
+        default: null,
     },
     releaseStatus: {
         type: String,

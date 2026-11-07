@@ -9,7 +9,8 @@ const config_1 = require("../config");
 const user_model_1 = require("../modules/auth/user.model");
 const auth = async (req, res, next) => {
     try {
-        const token = req.headers.authorization?.split(" ")[1];
+        const authorization = req.headers.authorization;
+        const token = authorization?.split(" ")[1];
         if (!token) {
             return res.status(401).json({ message: "Unauthorized access" });
         }
@@ -19,9 +20,9 @@ const auth = async (req, res, next) => {
             return res.status(404).json({ message: "User not found" });
         }
         req.user = {
+            _id: user._id,
             id: user._id,
             role: user.role,
-            // name: `${user.firstName} ${user.lastName}`.trim()
         };
         next();
     }

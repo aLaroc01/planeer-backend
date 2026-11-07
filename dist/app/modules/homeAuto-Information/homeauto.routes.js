@@ -7,11 +7,13 @@ exports.homeautoRoutes = void 0;
 const express_1 = __importDefault(require("express"));
 const auth_middleware_1 = require("./../../middleware/auth.middleware");
 const homeauto_controller_1 = require("./homeauto.controller");
+const requireEntitledGrantor_1 = require("./../../middleware/requireEntitledGrantor");
 const router = express_1.default.Router();
 // create Financial Information 
-router.post("/CreateHomeAuto", auth_middleware_1.auth, homeauto_controller_1.HomeAutoUpdate);
+router.post("/CreateHomeAuto", auth_middleware_1.auth, requireEntitledGrantor_1.requireEntitledGrantor, homeauto_controller_1.HomeAutoUpdate);
 //update Financial Information
-router.post("/UpdateHomeAuto", auth_middleware_1.auth, homeauto_controller_1.HomeAutoUpdate);
+router.post("/UpdateHomeAuto", auth_middleware_1.auth, requireEntitledGrantor_1.requireEntitledGrantor, homeauto_controller_1.HomeAutoUpdate);
 //get Financial Information
-router.get("/GetHomeautoData", auth_middleware_1.auth, homeauto_controller_1.GetHomeautoData);
+router.get("/GetHomeautoData", auth_middleware_1.auth, requireEntitledGrantor_1.requireEntitledGrantor, homeauto_controller_1.GetHomeautoData);
+router.get("/GetHomeAutoForProxy/:grantorId", auth_middleware_1.auth, homeauto_controller_1.GetHomeAutoForProxy);
 exports.homeautoRoutes = router;

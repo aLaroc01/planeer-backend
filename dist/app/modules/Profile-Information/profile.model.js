@@ -11,9 +11,14 @@ const profileSchema = new mongoose_1.Schema({
     city: { type: String, default: "" },
     state: { type: String, default: "" },
     zipcode: { type: String, default: "" },
-    imgUrl: { type: String, default: "" },
     phoneNumber: { type: String, default: "" },
-    mainRole: { type: String },
+    imgUrl: { type: String, default: null },
+    mainRole: {
+        type: String,
+        enum: ["GRANTOR", "PROXY"],
+        required: true,
+        default: "GRANTOR",
+    },
     suggestions: {
         type: [
             {
