@@ -448,7 +448,6 @@ export const searchUsersService = async (searchTerm: string) => {
 //     if (!user) {
 //       return { status: 'failed', message: 'User not found' };
 //     }
-//   console.log("ProxysetId:", user?.proxysetId);
 //     const followedUser = await User.findById(ProxysetUserIdObjectId);
 //     if (!followedUser) {
 //       return { status: 'failed', message: "Followed user not found" };
@@ -920,7 +919,6 @@ export const verifyProxyOtp = async (email: string, otp: string, password: strin
       { expiresIn: "1d" }
     );
 
-    // console.log("Generated JWT Token:", token);
 
     return {
       status: "success",

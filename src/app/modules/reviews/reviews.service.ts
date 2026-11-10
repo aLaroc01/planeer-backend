@@ -27,7 +27,6 @@ export const ReviewService = async (req: Request) => {
       data: newReport
     };
   } catch (error: any) {
-    console.log("Error creating report:", error);
     return {
       status: false,
       message: "Failed to create report",

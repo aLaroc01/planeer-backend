@@ -147,12 +147,6 @@ const getPackageId = async (
       );
     }
 
-    console.log("Resolved Planeer package from Stripe Price:", {
-      stripePriceId,
-      packageId: String(packageDoc._id),
-      packageTitle: packageDoc.title,
-    });
-
     return String(packageDoc._id);
   };
 
@@ -1007,7 +1001,6 @@ const subscriptionsFromDB = async (
 //  */
 // export const startSubscriptionExpireCron = () => {
 //   cron.schedule('0 0 * * *', async () => {
-//     console.log('Running subscription expire cron');
 //     await Subscription.updateMany(
 //       { status: 'active', currentPeriodEnd: { $lt: new Date() } },
 //       { $set: { status: 'expired' } },

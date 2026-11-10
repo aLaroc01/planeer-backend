@@ -132,7 +132,6 @@ export const ProfileCreateService = async (req: Request) => {
 
 
 export const ProfileUpdateService = async (req: Request) => {
-  console.log("FILES RAW:", (req as any).files);
   try {
     const { firstName, lastName, dateOfBirth, address, city, state, zipcode, phoneNumber, imgUrl } = req.body;
     const user_id = req.user?.id;
@@ -179,8 +178,6 @@ export const ProfileUpdateService = async (req: Request) => {
       const uploadPath = path.join(uploadsDir, safeName);
 
       await file.mv(uploadPath);
-      console.log("Saved file path:", uploadPath);
-      console.log("Exists:", fs.existsSync(uploadPath));
       finalImageUrl = `/uploads/${safeName}`;
     }
 
