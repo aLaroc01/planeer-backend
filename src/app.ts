@@ -65,12 +65,16 @@ app.set("views", path.join(__dirname, "views"));
 | CORS — must run before normal middleware, auth, rate limiting, and routes
 |--------------------------------------------------------------------------
 */
-const allowedOrigins = [
-  "https://planeer-frontend.vercel.app",
-  "https://myplaneer.com",
-  "http://localhost:5174",
-  "http://localhost:5173",
-];
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+if (allowedOrigins.length === 0) {
+  throw new Error(
+    "ALLOWED_ORIGINS must contain at least one frontend origin."
+  );
+}
 
 const corsOptions: CorsOptions = {
   origin: (origin, callback) => {
