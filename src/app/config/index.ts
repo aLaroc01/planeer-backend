@@ -12,7 +12,7 @@ export const config = {
    backend_url: process.env.BACKEND_URL,
   //copy 
      stripe: {
-          stripe_secret_key: process.env.STRIPE_SECRET_KYE,
+          stripe_secret_key: process.env.STRIPE_SECRET_KEY,
           paymentSuccess_url: process.env.STRIPE_PAYMENT_SUCCESS_URL,
           stripe_webhook_secret: process.env.STRIPE_WEBHOOK_SECRET,
           stripe_webhook_url: process.env.STRIPE_WEBHOOK_URL,
