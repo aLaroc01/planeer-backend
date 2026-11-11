@@ -5,6 +5,7 @@ import path from "path";
 import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
 import fs from "fs";
+import { isIP } from "node:net";
 
 // Routes
 import { userRoutes } from "./app/modules/auth/user.routes";
@@ -65,12 +66,14 @@ app.set("views", path.join(__dirname, "views"));
 | CORS — must run before normal middleware, auth, rate limiting, and routes
 |--------------------------------------------------------------------------
 */
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const allowedOrigins = new Set(
+  (process.env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+);
 
-if (allowedOrigins.length === 0) {
+if (allowedOrigins.size === 0) {
   throw new Error(
     "ALLOWED_ORIGINS must contain at least one frontend origin."
   );
@@ -78,16 +81,17 @@ if (allowedOrigins.length === 0) {
 
 const corsOptions: CorsOptions = {
   origin: (origin, callback) => {
-    // Allows curl, Postman, Render checks, and server-to-server calls.
     if (!origin) {
       return callback(null, true);
     }
 
-    if (allowedOrigins.includes(origin)) {
+    if (allowedOrigins.has(origin)) {
       return callback(null, true);
     }
 
-    return callback(new Error(`CORS blocked this origin: ${origin}`));
+    return callback(
+      new Error(`CORS blocked this origin: ${origin}`)
+    );
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -97,6 +101,66 @@ const corsOptions: CorsOptions = {
 };
 
 app.use(cors(corsOptions));
+
+/*
+|--------------------------------------------------------------------------
+| Staging IP restriction
+|--------------------------------------------------------------------------
+*/
+const restrictTestIPs =
+  process.env.RESTRICT_TEST_IPS === "true";
+
+const allowedIPs = new Set(
+  (process.env.ALLOWED_TEST_IPS || "")
+    .split(",")
+    .map((ip) => ip.trim())
+    .filter(Boolean)
+);
+
+if (restrictTestIPs && allowedIPs.size === 0) {
+  throw new Error(
+    "ALLOWED_TEST_IPS must be configured when RESTRICT_TEST_IPS=true."
+  );
+}
+
+if (restrictTestIPs) {
+  for (const ip of allowedIPs) {
+    if (isIP(ip) === 0) {
+      throw new Error(
+        `Invalid IP address in ALLOWED_TEST_IPS: ${ip}`
+      );
+    }
+  }
+}
+
+app.use(
+  (req: Request, res: Response, next: NextFunction) => {
+    if (!restrictTestIPs) {
+      return next();
+    }
+
+    if (req.method === "OPTIONS") {
+      return next();
+    }
+
+    // Assumes requests arrive through Render's public ingress.
+    const clientIP = req.get("CF-Connecting-IP")?.trim();
+
+    if (
+      !clientIP ||
+      isIP(clientIP) === 0 ||
+      !allowedIPs.has(clientIP)
+    ) {
+      res.status(403).json({
+        error: "Access denied",
+        message: "Your IP is not authorized to access this API.",
+      });
+      return;
+    }
+
+    next();
+  }
+);
 
 /*
 |--------------------------------------------------------------------------
@@ -134,43 +198,6 @@ app.use(
     createParentPath: true,
   })
 );
-
-/*
-|--------------------------------------------------------------------------
-| Optional IP allowlist
-|--------------------------------------------------------------------------
-*/
-const allowedIPs = (process.env.ALLOWED_TEST_IPS || "")
-  .split(",")
-  .map((ip) => ip.trim())
-  .filter(Boolean);
-
-app.use((req: Request, res: Response, next: NextFunction) => {
-  // CORS preflight must never be blocked here.
-  if (req.method === "OPTIONS") {
-    return next();
-  }
-
-  // If no IP list is configured, allow all requests.
-  if (allowedIPs.length === 0) {
-    return next();
-  }
-
-  const forwarded = req.headers["x-forwarded-for"];
-  const ip = forwarded
-    ? forwarded.toString().split(",")[0].trim()
-    : req.socket.remoteAddress || "";
-
-  if (allowedIPs.includes(ip)) {
-    return next();
-  }
-
-  return res.status(403).json({
-    error: "Access denied",
-    message: "Your IP is not authorized to access this API.",
-  });
-});
-
 /*
 |--------------------------------------------------------------------------
 | Uploaded files
@@ -179,7 +206,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 app.use("/uploads", (req: Request, res: Response, next: NextFunction) => {
   const origin = req.headers.origin;
 
-  if (origin && allowedOrigins.includes(origin)) {
+  if (origin && allowedOrigins.has(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Vary", "Origin");
   }
