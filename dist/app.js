@@ -9,6 +9,7 @@ const helmet_1 = __importDefault(require("helmet"));
 const path_1 = __importDefault(require("path"));
 const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const fs_1 = __importDefault(require("fs"));
 // Routes
 const user_routes_1 = require("./app/modules/auth/user.routes");
 const financial_routes_1 = require("./app/modules/financial-Information/financial.routes");
@@ -56,10 +57,13 @@ app.set("views", path_1.default.join(__dirname, "views"));
 | CORS — must run before normal middleware, auth, rate limiting, and routes
 |--------------------------------------------------------------------------
 */
-const allowedOrigins = [
-    "https://planeer-frontend.vercel.app",
-    "http://localhost:5173",
-];
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+if (allowedOrigins.length === 0) {
+    throw new Error("ALLOWED_ORIGINS must contain at least one frontend origin.");
+}
 const corsOptions = {
     origin: (origin, callback) => {
         // Allows curl, Postman, Render checks, and server-to-server calls.
@@ -155,7 +159,9 @@ app.use("/uploads", (req, res, next) => {
     res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
     return next();
 });
-app.use("/uploads", express_1.default.static(path_1.default.join(process.cwd(), "uploads"), {
+const uploadsDir = process.env.UPLOADS_DIR ||
+    path_1.default.join(process.cwd(), "uploads");
+app.use("/uploads", express_1.default.static(uploadsDir, {
     setHeaders: (res) => {
         res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     },
@@ -173,6 +179,16 @@ app.get("/health", (_req, res) => {
         timestamp: new Date().toISOString(),
     });
 });
+app.get("/debug/uploads", (_req, res) => {
+    const files = fs_1.default.existsSync(uploadsDir)
+        ? fs_1.default.readdirSync(uploadsDir)
+        : [];
+    res.json({
+        uploadsDir,
+        exists: fs_1.default.existsSync(uploadsDir),
+        files,
+    });
+});
 /*
 |--------------------------------------------------------------------------
 | API routes
@@ -186,7 +202,7 @@ app.use("/api/v1", personal_routes_1.personalRoutes);
 app.use("/api/v1", homeauto_routes_1.homeautoRoutes);
 app.use("/api/v1", report_routes_1.ReportRoutes);
 app.use("/api/v1", package_routes_1.PackageRoutes);
-app.use("/api/v1", subscriptions_routes_1.SubscriptionRoutes);
+app.use("/api/v1/subscriptions", subscriptions_routes_1.SubscriptionRoutes);
 app.use("/api/v1", reviews_routes_1.ReviewRoutes);
 app.use("/api/v1", connection_routes_1.default);
 app.use("/api/v1", digital_routes_1.digitalRoutes);
