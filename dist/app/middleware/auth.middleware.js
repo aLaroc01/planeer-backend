@@ -19,9 +19,9 @@ const auth = async (req, res, next) => {
             return res.status(404).json({ message: "User not found" });
         }
         req.user = {
+            _id: user._id,
             id: user._id,
             role: user.role,
-            // name: `${user.firstName} ${user.lastName}`.trim()
         };
         next();
     }

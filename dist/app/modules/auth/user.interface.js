@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AccountStatus = exports.Role = void 0;
+exports.AccountStatus = exports.PlanStatus = exports.Role = void 0;
 var Role;
 (function (Role) {
     Role["USER"] = "USER";
@@ -8,6 +8,14 @@ var Role;
     Role["PROXY"] = "PROXY";
     Role["SUPER_ADMIN"] = "SUPER_ADMIN";
 })(Role || (exports.Role = Role = {}));
+var PlanStatus;
+(function (PlanStatus) {
+    PlanStatus["ACTIVE"] = "ACTIVE";
+    PlanStatus["TRIALING"] = "TRIALING";
+    PlanStatus["FROZEN"] = "FROZEN";
+    PlanStatus["ARCHIVED"] = "ARCHIVED";
+    PlanStatus["SUBSCRIPTION_REQUIRED"] = "SUBSCRIPTION_REQUIRED";
+})(PlanStatus || (exports.PlanStatus = PlanStatus = {}));
 var AccountStatus;
 (function (AccountStatus) {
     AccountStatus["ACTIVE"] = "ACTIVE";

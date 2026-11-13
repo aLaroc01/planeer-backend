@@ -4,52 +4,72 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ProfileGetService = exports.ProfileUpdateService = exports.ProfileCreateService = void 0;
+const user_model_1 = require("../auth/user.model");
 const profile_model_1 = require("./profile.model");
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
+const accountRestriction_1 = require("../../../helpers/accountRestriction");
+const restoreExpiredArchive_1 = require("../../../helpers/restoreExpiredArchive");
 const ProfileCreateService = async (req) => {
-    const user_id = req.user?.id;
-    const requestBody = req.body;
-    const mainRole = "PROXY";
+    const userId = req.user?.id;
+    const { data, onboardingType } = req.body;
     try {
-        console.log("ProfileCreateService called with requestBody:", requestBody.data, user_id);
-        const activeProxy = await profile_model_1.ProfileModel.findOne({
-            userID: user_id, // check if profile already exists for this user
-        });
-        if (!activeProxy) {
-            const profileCreate = await profile_model_1.ProfileModel.create({
-                ...requestBody.data,
-                userID: user_id,
-                mainRole: mainRole,
-            });
-            return {
-                status: "success",
-                message: `Profile created successfully`,
-                data: profileCreate,
-            };
-        }
-        else {
+        if (!userId) {
             return {
                 status: "failed",
-                message: "Profile already exists for this user",
+                message: "Unauthorized: user ID is missing.",
             };
         }
+        if (!data || typeof data !== "object") {
+            return {
+                status: "failed",
+                message: "Profile data is required.",
+            };
+        }
+        const existingProfile = await profile_model_1.ProfileModel.findOne({
+            userID: userId,
+        });
+        if (existingProfile) {
+            return {
+                status: "failed",
+                message: "A profile already exists for this user.",
+            };
+        }
+        const normalizedOnboardingType = typeof onboardingType === "string"
+            ? onboardingType.trim().toLowerCase()
+            : "grantor";
+        const mainRole = normalizedOnboardingType === "proxy"
+            ? "PROXY"
+            : "GRANTOR";
+        const profileCreate = await profile_model_1.ProfileModel.create({
+            ...data,
+            userID: userId,
+            mainRole,
+        });
+        return {
+            status: "success",
+            message: "Profile created successfully.",
+            data: profileCreate,
+        };
     }
     catch (error) {
-        return { status: "failed", message: error.message || "Failed to create profile data" };
+        return {
+            status: "failed",
+            message: error?.message || "Failed to create profile data.",
+        };
     }
 };
 exports.ProfileCreateService = ProfileCreateService;
 const ProfileUpdateService = async (req) => {
-    // console.log("BODY RAW:", req.body);
     console.log("FILES RAW:", req.files);
     try {
-        const { firstName, lastName, dateOfBirth, address, city, state, imgUrl } = req.body;
+        const { firstName, lastName, dateOfBirth, address, city, state, zipcode, phoneNumber, imgUrl } = req.body;
         const user_id = req.user?.id;
-        if (!user_id) {
+        const restriction = await (0, accountRestriction_1.assertUserNotRestricted)(user_id);
+        if (!restriction.allowed) {
             return {
                 status: "failed",
-                message: "Unauthorized",
+                message: restriction.message,
             };
         }
         const updateData = {};
@@ -65,12 +85,16 @@ const ProfileUpdateService = async (req) => {
             updateData.state = state.trim();
         if (dateOfBirth?.trim())
             updateData.dateOfBirth = dateOfBirth.trim();
-        
+        if (phoneNumber?.trim())
+            updateData.phoneNumber = phoneNumber.trim();
+        if (zipcode?.trim())
+            updateData.zipcode = zipcode.trim();
         let finalImageUrl = imgUrl || null;
         const files = req.files;
         if (files?.image) {
             const file = Array.isArray(files.image) ? files.image[0] : files.image;
-            const uploadsDir = path_1.default.join(process.cwd(), "uploads");
+            const uploadsDir = process.env.UPLOADS_DIR ||
+                path_1.default.join(process.cwd(), "uploads");
             if (!fs_1.default.existsSync(uploadsDir)) {
                 fs_1.default.mkdirSync(uploadsDir, { recursive: true });
             }
@@ -110,15 +134,32 @@ const ProfileGetService = async (req) => {
         if (!user_id) {
             return { status: "failed", message: "Unauthorized" };
         }
-        const profileData = await profile_model_1.ProfileModel.findOne({ userID: user_id }, "-createdAt -updatedAt");
+        await (0, restoreExpiredArchive_1.restoreExpiredArchive)(user_id);
+        const [profileData, userData] = await Promise.all([
+            profile_model_1.ProfileModel.findOne({ userID: user_id }, "-createdAt -updatedAt"),
+            user_model_1.User.findById(user_id).select("email phoneNumber role accountStatus planStatus archiveExpiresAt"),
+        ]);
         if (!profileData) {
             return { status: "failed", message: "No profile data found" };
         }
-        // console.log("ProfileGetService called. Retrieved profile data:", profileData);  
+        if (!userData) {
+            return { status: "failed", message: "User not found" };
+        }
         return {
             status: "success",
             message: "Profile data retrieved successfully",
-            data: profileData,
+            data: {
+                profile: profileData,
+                user: {
+                    _id: userData._id,
+                    email: userData.email,
+                    phoneNumber: userData.phoneNumber,
+                    role: userData.role,
+                    accountStatus: userData.accountStatus,
+                    planStatus: userData.planStatus,
+                    archiveExpiresAt: userData.archiveExpiresAt,
+                },
+            },
         };
     }
     catch (error) {

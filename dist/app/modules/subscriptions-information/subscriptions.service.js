@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SubscriptionService = exports.getStripeMonthlyRevenue = exports.getMonthlyRevenueService = exports.getStripeSalesSummary = exports.checkActiveSubscription = exports.createBillingPortalSession = exports.handlePaymentFailed = exports.handleSubscriptionDeleted = exports.saveSubscriptionToDBFromPaymentLink = exports.saveSubscriptionToDB = exports.createSubscriptionCheckoutSession = exports.syncSubscriptionFromStripe = void 0;
+exports.SubscriptionService = exports.getStripeMonthlyRevenue = exports.getMonthlyRevenueService = exports.getStripeSalesSummary = exports.checkActiveSubscription = exports.createBillingPortalSession = exports.handlePaymentFailed = exports.handleSubscriptionDeleted = exports.saveSubscriptionToDBFromPaymentLink = exports.saveSubscriptionToDB = exports.handleInvoicePaid = exports.createSubscriptionCheckoutSession = exports.syncSubscriptionFromStripe = exports.syncSubscriptionById = void 0;
 const stripe_1 = __importDefault(require("stripe"));
 const AppError_1 = __importDefault(require("../../../errors/AppError"));
 const config_1 = require("../../config");
@@ -14,6 +14,7 @@ const subscriptions_model_1 = require("./subscriptions.model");
 const http_status_codes_1 = require("http-status-codes");
 const mongoose_1 = require("mongoose");
 const dayjs_1 = __importDefault(require("dayjs"));
+const accountRestriction_1 = require("../../../helpers/accountRestriction");
 const stripe = new stripe_1.default(process.env.STRIPE_SECRET_KEY ?? "", {
     apiVersion: "2025-10-29.clover",
 });
@@ -36,19 +37,71 @@ const asCustomerId = (customer) => {
         return null;
     return typeof customer === "string" ? customer : customer.id;
 };
-const getSubscriptionUserId = (subscription) => {
-    const userId = subscription.metadata?.userId;
-    if (!userId || !mongoose_1.Types.ObjectId.isValid(userId)) {
-        throw new AppError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, "Stripe subscription is missing a valid user ID.");
+const getSubscriptionUserId = async (subscription, sessionUserId) => {
+    // Use an existing subscription association first.
+    // Do not reassign an already linked subscription.
+    const existingSubscription = await subscriptions_model_1.Subscription.findOne({
+        stripeSubscriptionId: subscription.id,
+    })
+        .select("userId")
+        .lean();
+    if (existingSubscription?.userId) {
+        return String(existingSubscription.userId);
     }
-    return userId;
+    const metadataUserId = subscription.metadata?.userId ??
+        subscription.metadata?.user_id ??
+        null;
+    // Prefer an existing Stripe customer association over
+    // a Checkout client_reference_id.
+    const customerId = asCustomerId(subscription.customer);
+    if (customerId) {
+        const linkedUser = await user_model_1.User.findOne({
+            stripeCustomerId: customerId,
+        })
+            .select("_id")
+            .lean();
+        if (linkedUser) {
+            return String(linkedUser._id);
+        }
+    }
+    const candidateId = metadataUserId ?? sessionUserId;
+    if (!candidateId ||
+        !mongoose_1.Types.ObjectId.isValid(candidateId)) {
+        throw new AppError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, "Stripe subscription could not be linked to a Planeer user.");
+    }
+    const userExists = await user_model_1.User.exists({
+        _id: candidateId,
+    });
+    if (!userExists) {
+        throw new AppError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, "The user associated with this subscription was not found.");
+    }
+    return candidateId;
 };
-const getPackageId = (subscription) => {
-    const packageId = subscription.metadata?.packageId;
-    if (!packageId || !mongoose_1.Types.ObjectId.isValid(packageId)) {
-        throw new AppError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, "Stripe subscription is missing a valid package ID.");
+const getPackageId = async (subscription) => {
+    const metadataPackageId = subscription.metadata?.packageId ??
+        subscription.metadata?.package_id ??
+        null;
+    if (metadataPackageId && mongoose_1.Types.ObjectId.isValid(metadataPackageId)) {
+        return metadataPackageId;
     }
-    return packageId;
+    const stripePriceId = subscription.items.data[0]?.price?.id;
+    if (!stripePriceId) {
+        throw new AppError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, "Stripe subscription is missing a Stripe Price ID.");
+    }
+    const packageDoc = await package_model_1.Package.findOne({
+        priceId: stripePriceId,
+        status: "active",
+        isDeleted: false,
+    }).select("_id title priceId");
+    if (!packageDoc) {
+        throw new AppError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, `No active Planeer package matches Stripe Price ID: ${stripePriceId}`);
+    }
+    console.log("Resolved Planeer package from Stripe Price:", {
+        stripePriceId,
+        packageId: String(packageDoc._id),
+        packageTitle: packageDoc.title,
+    });
+    return String(packageDoc._id);
 };
 const getStripePriceId = (subscription) => {
     const item = subscription.items.data[0];
@@ -65,29 +118,60 @@ const getCurrency = (subscription) => {
     const item = subscription.items.data[0];
     return item?.price?.currency?.toLowerCase() ?? "usd";
 };
-const syncSubscriptionFromStripe = async (stripeSubscription) => {
-    const userId = getSubscriptionUserId(stripeSubscription);
-    const packageId = getPackageId(stripeSubscription);
+const mapStripeSubscriptionStatus = (stripeStatus) => {
+    switch (stripeStatus) {
+        case "active":
+        case "trialing":
+            return "active";
+        case "canceled":
+            return "cancel";
+        case "past_due":
+        case "unpaid":
+        case "incomplete":
+        case "incomplete_expired":
+        case "paused":
+            return "deactivated";
+        default:
+            return "expired";
+    }
+};
+const syncSubscriptionById = async (subscriptionId) => {
+    const currentSubscription = await stripe.subscriptions.retrieve(subscriptionId);
+    return (0, exports.syncSubscriptionFromStripe)(currentSubscription);
+};
+exports.syncSubscriptionById = syncSubscriptionById;
+// Synchronize a Stripe subscription with the local database. 
+const syncSubscriptionFromStripe = async (stripeSubscription, sessionUserId) => {
+    const userId = await getSubscriptionUserId(stripeSubscription, sessionUserId);
+    const packageId = await getPackageId(stripeSubscription);
     const stripeCustomerId = asCustomerId(stripeSubscription.customer);
     if (!stripeCustomerId) {
         throw new AppError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, "Stripe subscription is missing a customer ID.");
     }
-    const status = stripeSubscription.status;
+    const currentPeriodStart = toDate(stripeSubscription.items.data[0]?.current_period_start);
+    const currentPeriodEnd = toDate(stripeSubscription.items.data[0]?.current_period_end);
+    if (!currentPeriodStart || !currentPeriodEnd) {
+        throw new AppError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, "Stripe subscription is missing its current billing period.");
+    }
+    const remaining = Math.max(0, Math.ceil((currentPeriodEnd.getTime() - Date.now()) /
+        (1000 * 60 * 60 * 24)));
     const subscriptionData = {
-        stripeCustomerId,
-        stripePriceId: getStripePriceId(stripeSubscription),
-        priceAmount: getPriceAmount(stripeSubscription),
+        customerId: stripeCustomerId,
+        price: getPriceAmount(stripeSubscription),
         currency: getCurrency(stripeSubscription),
         userId: new mongoose_1.Types.ObjectId(userId),
         package: new mongoose_1.Types.ObjectId(packageId),
-        status,
-        trialStart: toDate(stripeSubscription.trial_start),
-        trialEnd: toDate(stripeSubscription.trial_end),
-        currentPeriodStart: toDate(stripeSubscription.items.data[0]?.current_period_start),
-        currentPeriodEnd: toDate(stripeSubscription.items.data[0]?.current_period_end),
+        currentPeriodStart,
+        currentPeriodEnd,
+        remaining,
+        // Preserve existing local status for compatibility.
+        status: mapStripeSubscriptionStatus(stripeSubscription.status),
+        // Preserve the actual Stripe lifecycle state.
+        stripeStatus: stripeSubscription.status,
         cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
+        paymentCollectionPaused: Boolean(stripeSubscription.pause_collection),
+        trialEnd: toDate(stripeSubscription.trial_end),
         canceledAt: toDate(stripeSubscription.canceled_at),
-        endedAt: toDate(stripeSubscription.ended_at),
     };
     const dbSubscription = await subscriptions_model_1.Subscription.findOneAndUpdate({ stripeSubscriptionId: stripeSubscription.id }, {
         $set: subscriptionData,
@@ -101,24 +185,34 @@ const syncSubscriptionFromStripe = async (stripeSubscription) => {
     });
     const hasEntitledSubscription = await subscriptions_model_1.Subscription.exists({
         userId: new mongoose_1.Types.ObjectId(userId),
-        status: { $in: [...ENTITLED_SUBSCRIPTION_STATUSES] },
+        stripeStatus: {
+            $in: [...OPEN_SUBSCRIPTION_STATUSES],
+        },
+        currentPeriodEnd: { $gt: new Date() },
     });
     const userUpdate = {
         stripeCustomerId,
         isSubscribed: Boolean(hasEntitledSubscription),
     };
-    // A user consumes the free trial once Stripe creates a trialing subscription.
-    // This is intentionally never reset if they later cancel.
-    if (status === "trialing") {
-        userUpdate.hasUsedFreeTrial = true;
-        userUpdate.freeTrialUsedAt = new Date();
-    }
     await user_model_1.User.findByIdAndUpdate(userId, {
         $set: userUpdate,
     });
+    if (stripeSubscription.status === "trialing") {
+        await user_model_1.User.updateOne({
+            _id: userId,
+            hasUsedFreeTrial: { $ne: true },
+        }, {
+            $set: {
+                hasUsedFreeTrial: true,
+                freeTrialUsedAt: toDate(stripeSubscription.trial_start) ??
+                    new Date(),
+            },
+        });
+    }
     return dbSubscription;
 };
 exports.syncSubscriptionFromStripe = syncSubscriptionFromStripe;
+// Create a new subscription checkout session for the user.
 const createSubscriptionCheckoutSession = async (userId, packageId) => {
     if (!mongoose_1.Types.ObjectId.isValid(userId)) {
         throw new AppError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, "Invalid user ID");
@@ -141,7 +235,9 @@ const createSubscriptionCheckoutSession = async (userId, packageId) => {
     }
     const openSubscription = await subscriptions_model_1.Subscription.findOne({
         userId: user._id,
-        status: { $in: [...OPEN_SUBSCRIPTION_STATUSES] },
+        stripeStatus: {
+            $in: [...OPEN_SUBSCRIPTION_STATUSES],
+        },
     }).sort({ createdAt: -1 });
     if (openSubscription) {
         throw new AppError_1.default(http_status_codes_1.StatusCodes.CONFLICT, "You already have an open subscription. Use Billing to manage it.");
@@ -198,6 +294,35 @@ const createSubscriptionCheckoutSession = async (userId, packageId) => {
     };
 };
 exports.createSubscriptionCheckoutSession = createSubscriptionCheckoutSession;
+// Handle the event when an invoice is paid in Stripe. 
+// This function synchronizes the subscription associated with the paid invoice.
+const handleInvoicePaid = async (invoice) => {
+    const subscriptionReference = invoice.parent?.subscription_details?.subscription;
+    if (!subscriptionReference) {
+        return {
+            success: true,
+            message: "Invoice is not associated with a subscription.",
+            data: null,
+            statusCode: http_status_codes_1.StatusCodes.OK,
+        };
+    }
+    const subscriptionId = typeof subscriptionReference === "string"
+        ? subscriptionReference
+        : subscriptionReference.id;
+    const stripeSubscription = await stripe.subscriptions.retrieve(subscriptionId);
+    const subscription = await (0, exports.syncSubscriptionFromStripe)(stripeSubscription);
+    return {
+        success: true,
+        message: "Paid invoice subscription synchronized.",
+        data: {
+            subscriptionId: subscription.stripeSubscriptionId,
+            userId: subscription.userId,
+        },
+        statusCode: http_status_codes_1.StatusCodes.OK,
+    };
+};
+exports.handleInvoicePaid = handleInvoicePaid;
+// Save the subscription to the database after a successful checkout session.
 const saveSubscriptionToDB = async (sessionId) => {
     const session = await stripe.checkout.sessions.retrieve(sessionId);
     if (session.mode !== "subscription") {
@@ -212,9 +337,10 @@ const saveSubscriptionToDB = async (sessionId) => {
     const stripeSubscription = typeof session.subscription === "string"
         ? await stripe.subscriptions.retrieve(session.subscription)
         : session.subscription;
-    return (0, exports.syncSubscriptionFromStripe)(stripeSubscription);
+    return (0, exports.syncSubscriptionFromStripe)(stripeSubscription, session.client_reference_id);
 };
 exports.saveSubscriptionToDB = saveSubscriptionToDB;
+// Save the subscription to the database after a successful payment link session.
 const saveSubscriptionToDBFromPaymentLink = async (session) => {
     if (session.mode !== "subscription" || !session.subscription) {
         throw new AppError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, "The Checkout Session has no subscription.");
@@ -225,9 +351,11 @@ const saveSubscriptionToDBFromPaymentLink = async (session) => {
     const stripeSubscription = typeof session.subscription === "string"
         ? await stripe.subscriptions.retrieve(session.subscription)
         : session.subscription;
-    return (0, exports.syncSubscriptionFromStripe)(stripeSubscription);
+    return (0, exports.syncSubscriptionFromStripe)(stripeSubscription, session.client_reference_id);
 };
 exports.saveSubscriptionToDBFromPaymentLink = saveSubscriptionToDBFromPaymentLink;
+// Handle the event when a subscription is deleted in Stripe. 
+// This function synchronizes the subscription cancellation.
 const handleSubscriptionDeleted = async (stripeSubscription) => {
     const subscription = await (0, exports.syncSubscriptionFromStripe)(stripeSubscription);
     return {
@@ -241,6 +369,7 @@ const handleSubscriptionDeleted = async (stripeSubscription) => {
     };
 };
 exports.handleSubscriptionDeleted = handleSubscriptionDeleted;
+// Handle the event when a subscription payment fails in Stripe.
 const handlePaymentFailed = async (invoice) => {
     const subscriptionId = invoice.parent?.subscription_details?.subscription;
     if (!subscriptionId) {
@@ -267,10 +396,18 @@ const handlePaymentFailed = async (invoice) => {
     };
 };
 exports.handlePaymentFailed = handlePaymentFailed;
+// Create a billing portal session for the user to manage their subscription.
 const createBillingPortalSession = async (userId) => {
     const user = await user_model_1.User.findById(userId).select("+stripeCustomerId");
     if (!user) {
         throw new AppError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, "User not found");
+    }
+    const restriction = await (0, accountRestriction_1.assertUserNotRestricted)(userId);
+    if (!restriction.allowed) {
+        return {
+            status: "failed",
+            message: restriction.message,
+        };
     }
     if (!user.stripeCustomerId) {
         throw new AppError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, "No Stripe billing account was found for this user.");
@@ -615,42 +752,38 @@ const checkActiveSubscription = async (userId) => {
     return true;
 };
 exports.checkActiveSubscription = checkActiveSubscription;
-// const getMonthlyEarningsStatsFromDB = async (year: number) => {
-//   const stats = await Subscription.aggregate([
-//     {
-//       $match: {
-//         status: { $in: ['active', 'expired'] },
-//         createdAt: {
-//           $gte: new Date(`${year}-01-01`),
-//           $lte: new Date(`${year}-12-31`),
-//         },
-//       },
-//     },
-//     {
-//       $group: {
-//         _id: { month: { $month: '$createdAt' } },
-//         totalEarnings: { $sum: '$price' },
-//         totalSubscriptions: { $sum: 1 },
-//       },
-//     },
-//     {
-//       $project: {
-//         _id: 0,
-//         month: '$_id.month',
-//         totalEarnings: 1,
-//         totalSubscriptions: 1,
-//       },
-//     },
-//     {
-//       $sort: { month: 1 },
-//     },
-//   ]);
-//   return stats;
-// };
-// interface MonthlyRevenue {
-//   month: string;
-//   revenue: number;
-// }
+const getMonthlyEarningsStatsFromDB = async (year) => {
+    const stats = await subscriptions_model_1.Subscription.aggregate([
+        {
+            $match: {
+                status: { $in: ['active', 'expired'] },
+                createdAt: {
+                    $gte: new Date(`${year}-01-01`),
+                    $lte: new Date(`${year}-12-31`),
+                },
+            },
+        },
+        {
+            $group: {
+                _id: { month: { $month: '$createdAt' } },
+                totalEarnings: { $sum: '$price' },
+                totalSubscriptions: { $sum: 1 },
+            },
+        },
+        {
+            $project: {
+                _id: 0,
+                month: '$_id.month',
+                totalEarnings: 1,
+                totalSubscriptions: 1,
+            },
+        },
+        {
+            $sort: { month: 1 },
+        },
+    ]);
+    return stats;
+};
 const getStripeSalesSummary = async () => {
     let activeSubscriptions = 0;
     let pastDueSubscriptions = 0;
@@ -974,12 +1107,15 @@ exports.SubscriptionService = {
     subscriptionsFromDB,
     getMonthlyRevenueService: exports.getMonthlyRevenueService,
     getSalesSummary,
+    getMonthlyEarningsStatsFromDB,
     createSubscriptionCheckoutSession: exports.createSubscriptionCheckoutSession,
     saveSubscriptionToDB: exports.saveSubscriptionToDB,
     saveSubscriptionToDBFromPaymentLink: exports.saveSubscriptionToDBFromPaymentLink,
     syncSubscriptionFromStripe: exports.syncSubscriptionFromStripe,
     handleSubscriptionDeleted: exports.handleSubscriptionDeleted,
     handlePaymentFailed: exports.handlePaymentFailed,
+    handleInvoicePaid: exports.handleInvoicePaid,
     createBillingPortalSession: exports.createBillingPortalSession,
     checkActiveSubscription: exports.checkActiveSubscription,
+    syncSubscriptionById: exports.syncSubscriptionById,
 };

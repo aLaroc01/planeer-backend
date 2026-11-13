@@ -35,11 +35,19 @@ const getAllTickets = async (status) => {
     const populateFields = [
         {
             path: "userId",
-            select: "firstName lastName email imgUrl",
+            select: "email imgUrl profile",
+            populate: {
+                path: "profile",
+                select: "firstName lastName imgUrl",
+            },
         },
         {
             path: "updatedBy",
-            select: "firstName lastName email imgUrl",
+            select: "email imgUrl profile",
+            populate: {
+                path: "profile",
+                select: "firstName lastName imgUrl",
+            },
         },
     ];
     // If the dashboard filters by a specific status,

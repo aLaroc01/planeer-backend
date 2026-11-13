@@ -27,6 +27,30 @@ const userSchema = new mongoose_1.Schema({
         default: user_interface_1.AccountStatus.PENDING_VERIFICATION,
         index: true,
     },
+    activeArchiveRequestId: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: "ArchiveRequest",
+        default: null,
+    },
+    planStatus: {
+        type: String,
+        enum: Object.values(user_interface_1.PlanStatus),
+        default: user_interface_1.PlanStatus.ACTIVE,
+        index: true,
+    },
+    planStatusChangedAt: {
+        type: Date,
+        default: null,
+    },
+    planStatusChangedBy: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: "User",
+        default: null,
+    },
+    archiveExpiresAt: {
+        type: Date,
+        default: null,
+    },
     // New: set after a successful login
     lastLoginAt: {
         type: Date,
@@ -71,5 +95,17 @@ const userSchema = new mongoose_1.Schema({
 }, {
     timestamps: true,
     versionKey: false,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+});
+userSchema.virtual("profile", {
+    ref: "profile",
+    localField: "_id",
+    foreignField: "userID",
+    justOne: true,
+});
+userSchema.index({
+    planStatus: 1,
+    archiveExpiresAt: 1,
 });
 exports.User = (0, mongoose_1.model)("User", userSchema);

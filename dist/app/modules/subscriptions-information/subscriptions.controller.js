@@ -102,33 +102,24 @@ exports.checkoutSuccessController = (0, catchAsync_1.default)(async (req, res) =
     if (!sessionId) {
         throw new AppError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Session ID is required');
     }
-    //     if (!userId) {
-    //         throw new AppError(StatusCodes.UNAUTHORIZED, 'User not found');
-    //     }
     // Save subscription in DB   userId
     const subscription = await (0, subscriptions_service_1.saveSubscriptionToDB)(sessionId);
-    // Send response
-    //     sendResponse(res, {
-    //         statusCode: StatusCodes.OK,
-    //         success: true,
-    //         message: 'Subscription created successfully',
-    //         data: subscription,
-    //     });
-    // 
-    res.render('subscription-success', { subscription });
+    res.status(http_status_codes_1.StatusCodes.OK).json({
+        success: true,
+        message: "Subscription verified successfully.",
+        data: subscription,
+    });
 });
-//  const monthlyEarningsStats = catchAsync(async (req, res) => {
-//           const year = Number(req.query.year) || new Date().getFullYear();
-//           const result =
-//                await SubscriptionService.getMonthlyEarningsStatsFromDB(year);
-//           sendResponse(res, {
-//                statusCode: StatusCodes.OK,
-//                success: true,
-//                message: 'Monthly earnings stats retrieved successfully',
-//                data: result,
-//           });
-//      }
-// );
+const monthlyEarningsStats = (0, catchAsync_1.default)(async (req, res) => {
+    const year = Number(req.query.year) || new Date().getFullYear();
+    const result = await subscriptions_service_1.SubscriptionService.getMonthlyEarningsStatsFromDB(year);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        success: true,
+        message: 'Monthly earnings stats retrieved successfully',
+        data: result,
+    });
+});
 exports.getStripeMonthlyRevenueController = (0, catchAsync_1.default)(async (_req, res) => {
     const result = await subscriptions_service_1.SubscriptionService.getStripeMonthlyRevenue();
     (0, sendResponse_1.default)(res, {
@@ -210,6 +201,15 @@ exports.stripeWebhookHandler = (0, catchAsync_1.default)(async (req, res) => {
         switch (event.type) {
             case "checkout.session.completed": {
                 const session = event.data.object;
+                if (session.mode !== "subscription") {
+                    responseData = {
+                        statusCode: http_status_codes_1.StatusCodes.OK,
+                        success: true,
+                        message: "Non-subscription Checkout Session ignored",
+                        data: null,
+                    };
+                    break;
+                }
                 const subscription = await subscriptions_service_1.SubscriptionService.saveSubscriptionToDBFromPaymentLink(session);
                 responseData = {
                     statusCode: http_status_codes_1.StatusCodes.OK,
@@ -219,15 +219,19 @@ exports.stripeWebhookHandler = (0, catchAsync_1.default)(async (req, res) => {
                 };
                 break;
             }
+            case "invoice.paid": {
+                responseData = await subscriptions_service_1.SubscriptionService.handleInvoicePaid(event.data.object);
+                break;
+            }
             case "customer.subscription.created":
             case "customer.subscription.updated":
             case "customer.subscription.deleted": {
-                const stripeSubscription = event.data.object;
-                const subscription = await subscriptions_service_1.SubscriptionService.syncSubscriptionFromStripe(stripeSubscription);
+                const eventSubscription = event.data.object;
+                const subscription = await subscriptions_service_1.SubscriptionService.syncSubscriptionById(eventSubscription.id);
                 responseData = {
                     statusCode: http_status_codes_1.StatusCodes.OK,
                     success: true,
-                    message: `Subscription ${stripeSubscription.status} synchronized`,
+                    message: "Subscription state synchronized",
                     data: subscription,
                 };
                 break;
@@ -270,7 +274,7 @@ exports.SubscriptionController = {
     getSalesSummaryController: exports.getSalesSummaryController,
     // orderSuccess,
     orderCancel,
-    //  monthlyEarningsStats,
+    monthlyEarningsStats,
     getStripeSalesSummaryController: exports.getStripeSalesSummaryController,
     createBillingPortalSession,
     stripeWebhookHandler: exports.stripeWebhookHandler,

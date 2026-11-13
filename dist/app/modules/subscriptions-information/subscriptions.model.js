@@ -12,6 +12,40 @@ const subscriptionSchema = new mongoose_1.Schema({
         type: String,
         required: true,
     },
+    stripeStatus: {
+        type: String,
+        enum: [
+            "incomplete",
+            "incomplete_expired",
+            "trialing",
+            "active",
+            "past_due",
+            "canceled",
+            "unpaid",
+            "paused",
+        ],
+        default: null,
+    },
+    cancelAtPeriodEnd: {
+        type: Boolean,
+        default: false,
+    },
+    paymentCollectionPaused: {
+        type: Boolean,
+        default: false,
+    },
+    trialEnd: {
+        type: Date,
+        default: null,
+    },
+    canceledAt: {
+        type: Date,
+        default: null,
+    },
+    currency: {
+        type: String,
+        default: "usd",
+    },
     price: {
         type: Number,
         required: true,

@@ -3,13 +3,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.acceptProxyInviteService = exports.updateConnectionPreauthorizedReleaseService = exports.acceptProxyDirectService = exports.denyProxyDirectService = exports.createProxyConnectionService = exports.sendConnectionRequestService = exports.getConnectionsForUserService = exports.canAddGrantorForProxy = void 0;
+exports.acceptProxyInviteService = exports.updateConnectionPreauthorizedReleaseService = exports.acceptProxyDirectService = exports.denyProxyDirectService = exports.createProxyConnectionService = exports.sendConnectionRequestService = exports.getConnectionsForUserService = exports.canAddGrantorForProxy = exports.canAddProxyForGrantor = void 0;
+const mongoose_1 = require("mongoose");
 const connection_model_1 = __importDefault(require("./connection.model"));
 const user_model_1 = require("../auth/user.model");
 const profile_model_1 = require("../Profile-Information/profile.model");
 const emailHelper_1 = require("../../../helpers/emailHelper");
 const checklist_model_1 = __importDefault(require("../checklist/checklist.model"));
-const mongoose_1 = __importDefault(require("mongoose"));
+const mongoose_2 = __importDefault(require("mongoose"));
+const accountRestriction_1 = require("../../../helpers/accountRestriction");
 /**
  * Helper: normalize email from body
  */
@@ -33,64 +35,101 @@ const canAddProxyForGrantor = async (grantorId, proxyUserId) => {
     }
     return { ok: true, currentUser };
 };
+exports.canAddProxyForGrantor = canAddProxyForGrantor;
 /**
  * Helper: enforce proxy-side limit (max 2 grantors per proxy)
  */
 const canAddGrantorForProxy = async (req) => {
-    const currentUserId = req.user?.id;
-    const proxySearchEmail = String(req.body.proxyEmail || "").trim().toLowerCase();
-    if (!currentUserId) {
-        return { ok: false, message: "Unauthorized" };
-    }
-    if (!proxySearchEmail) {
-        return { ok: false, message: "Proxy email is required" };
-    }
-    const activeProxyCount = await connection_model_1.default.countDocuments({
-        proxyEmail: proxySearchEmail,
-        status: { $in: ["active", "invited", "PENDING VERIFICATION", "ACTIVE"] },
-    });
-    if (activeProxyCount >= 2) {
-        return { ok: false, message: "This proxy already has 2 grantors" };
-    }
-    if (activeProxyCount === 0) {
-        return { ok: false, message: "There is no user with this email" };
-    }
-    // 2) Check if *this* grantor is already connected to this proxy
-    const existingConnection = await connection_model_1.default.findOne({
-        proxyEmail: proxySearchEmail,
-        grantorId: currentUserId,
-        status: { $in: ["active", "invited"] },
-    });
-    if (existingConnection) {
+    try {
+        const currentUserId = req.user?.id;
+        const proxyEmail = String(req.body?.proxyEmail || "")
+            .trim()
+            .toLowerCase();
+        if (!currentUserId) {
+            return {
+                status: "failed",
+                message: "Unauthorized.",
+            };
+        }
+        if (!proxyEmail) {
+            return {
+                status: "failed",
+                message: "Proxy email is required.",
+            };
+        }
+        const proxyUser = await user_model_1.User.findOne({
+            email: proxyEmail,
+        })
+            .select("_id email")
+            .lean();
+        if (!proxyUser) {
+            return {
+                status: "failed",
+                message: "No Planeer user exists with this email.",
+            };
+        }
+        const existingConnection = await connection_model_1.default.findOne({
+            grantorId: currentUserId,
+            proxyUserId: proxyUser._id,
+            status: {
+                $in: ["invited", "active"],
+            },
+        }).lean();
+        if (existingConnection) {
+            return {
+                status: "failed",
+                message: "You are already connected to or have invited this person.",
+            };
+        }
+        const proxyGrantorCount = await connection_model_1.default.countDocuments({
+            proxyUserId: proxyUser._id,
+            status: {
+                $in: ["invited", "active"],
+            },
+        });
+        /*
+          0 connections → invitation allowed
+          1 connection  → invitation allowed
+          2 connections → blocked
+        */
+        if (proxyGrantorCount >= 2) {
+            return {
+                status: "failed",
+                message: "This proxy already has 2 grantors.",
+            };
+        }
+        const profile = await profile_model_1.ProfileModel.findOne({
+            userID: proxyUser._id,
+        })
+            .select("firstName lastName city state imgUrl")
+            .lean();
         return {
-            ok: false,
-            message: "You are already connected or have invited this proxy",
+            status: "success",
+            data: {
+                ok: true,
+                userExists: true,
+                proxyUserId: String(proxyUser._id),
+                currentGrantorCount: proxyGrantorCount,
+                remainingGrantorSlots: 2 - proxyGrantorCount,
+                profile: {
+                    firstName: profile?.firstName || "",
+                    lastName: profile?.lastName || "",
+                    email: proxyUser.email,
+                    city: profile?.city || "",
+                    state: profile?.state || "",
+                    imgUrl: profile?.imgUrl || "",
+                },
+            },
         };
     }
-    const proxyIdFound = await connection_model_1.default.findOne({
-        proxyEmail: proxySearchEmail,
-        status: { $in: ["active", "invited"] },
-    });
-    const profile = await profile_model_1.ProfileModel.findOne({ userID: proxyIdFound.proxyUserId, }).select("firstName lastName city state");
-    const userImg = await user_model_1.User.findOne({ _id: proxyIdFound.proxyUserId, }).select("imgUrl");
-    // console.log("info stuff:", profile?.firstName, profile?.lastName, profile?.city, profile?.state, userImg?.imgUrl)
-    return {
-        status: "success",
-        data: {
-            ok: true,
-            userExists: Boolean(profile),
-            profile: profile
-                ? {
-                    firstName: profile.firstName,
-                    lastName: profile.lastName,
-                    city: profile.city,
-                    state: profile.state,
-                    imgUrl: userImg?.imgUrl,
-                    proxyId: proxyIdFound.proxyUserId,
-                }
-                : null,
-        },
-    };
+    catch (error) {
+        console.error("canAddGrantorForProxy error:", error);
+        return {
+            status: "failed",
+            message: error?.message ||
+                "Unable to search for this proxy.",
+        };
+    }
 };
 exports.canAddGrantorForProxy = canAddGrantorForProxy;
 /**
@@ -161,81 +200,97 @@ exports.canAddGrantorForProxy = canAddGrantorForProxy;
 //   }
 // };
 const getConnectionsForUserService = async (req) => {
+    const currentUserId = req.user?.id;
     try {
-        const currentUserId = req.user?.id;
         if (!currentUserId) {
-            return { status: "failed", message: "Unauthorized" };
-        }
-        // 1) Find all connections where current user is grantor OR proxy
-        const connections = await connection_model_1.default.find({
-            $or: [
-                { grantorId: currentUserId },
-                { proxyUserId: currentUserId },
-            ],
-        });
-        if (!connections.length) {
             return {
-                status: "success",
-                message: "No connections found",
-                data: [],
+                status: "failed",
+                message: "Current user not found.",
             };
         }
-        // 2) Collect all "other user" ids (the person on the other side)
-        const otherUserIds = [];
-        connections.forEach((conn) => {
-            const isGrantor = String(conn.grantorId) === String(currentUserId);
-            const otherId = isGrantor ? conn.proxyUserId : conn.grantorId;
-            if (otherId) {
-                otherUserIds.push(String(otherId));
-            }
-        });
-        // 3) Fetch profiles for those other users
-        const otherProfiles = await profile_model_1.ProfileModel.find({
-            userID: { $in: otherUserIds },
-        }).select("userID firstName lastName mainRole address city state");
-        // 4) Fetch user images for those other users
-        const otherUsers = await user_model_1.User.find({
-            _id: { $in: otherUserIds },
-        }).select("_id imgUrl");
-        // Build maps: userID -> profile / user
-        const profileMap = new Map(otherProfiles.map((p) => [String(p.userID), p]));
-        const userImgMap = new Map(otherUsers.map((u) => [String(u._id), u.imgUrl]));
-        // 5) Shape the result as: viewer vs otherUser
-        const shaped = connections.map((conn) => {
-            const viewerIsGrantor = String(conn.grantorId) === String(currentUserId);
-            const viewerRole = viewerIsGrantor ? "GRANTOR" : "PROXY";
-            const otherUserId = viewerIsGrantor ? conn.proxyUserId : conn.grantorId;
-            const otherRole = viewerIsGrantor ? "PROXY" : "GRANTOR";
-            const profile = otherUserId
-                ? profileMap.get(String(otherUserId))
+        const currentUserObjectId = new mongoose_1.Types.ObjectId(currentUserId);
+        const connections = await connection_model_1.default.find({
+            $or: [
+                { grantorId: currentUserObjectId },
+                { proxyUserId: currentUserObjectId },
+            ],
+            status: {
+                $in: ["invited", "active"],
+            },
+        })
+            .sort({ createdAt: -1 })
+            .lean();
+        const otherUserIds = connections
+            .map((connection) => {
+            const viewerIsGrantor = String(connection.grantorId) === String(currentUserObjectId);
+            return viewerIsGrantor
+                ? connection.proxyUserId
+                : connection.grantorId;
+        })
+            .filter(Boolean)
+            .map((id) => new mongoose_1.Types.ObjectId(String(id)));
+        const uniqueOtherUserIds = [
+            ...new Map(otherUserIds.map((id) => [String(id), id])).values(),
+        ];
+        const [otherUsers, otherProfiles] = await Promise.all([
+            user_model_1.User.find({
+                _id: { $in: uniqueOtherUserIds },
+            })
+                .select("_id email")
+                .lean(),
+            profile_model_1.ProfileModel.find({
+                userID: { $in: uniqueOtherUserIds },
+            })
+                .select("userID firstName lastName city state imgUrl")
+                .lean(),
+        ]);
+        const usersById = new Map(otherUsers.map((user) => [String(user._id), user]));
+        const profilesByUserId = new Map(otherProfiles.map((profile) => [
+            String(profile.userID),
+            profile,
+        ]));
+        const formattedConnections = connections.map((connection) => {
+            const viewerIsGrantor = String(connection.grantorId) ===
+                String(currentUserObjectId);
+            const otherUserId = viewerIsGrantor
+                ? connection.proxyUserId
+                : connection.grantorId;
+            const otherUser = otherUserId
+                ? usersById.get(String(otherUserId))
                 : null;
-            const imgUrl = otherUserId
-                ? userImgMap.get(String(otherUserId))
-                : undefined;
+            const otherProfile = otherUserId
+                ? profilesByUserId.get(String(otherUserId))
+                : null;
             return {
-                _id: conn._id,
-                status: conn.status,
-                viewerRole, // role of current user in this connection
-                otherUserRole: otherRole, // role of the other side
-                otherUserId,
-                otherFirstName: profile?.firstName || "",
-                otherLastName: profile?.lastName || "",
-                otherAddress: profile?.address || "",
-                city: profile?.city || "",
-                state: profile?.state || "",
-                imgUrl: imgUrl || "",
+                _id: connection._id,
+                status: connection.status,
+                createdAt: connection.createdAt,
+                updatedAt: connection.updatedAt,
+                viewerRole: viewerIsGrantor ? "grantor" : "proxy",
+                otherPerson: {
+                    userId: otherUserId || null,
+                    // The email fallback is essential for a newly invited,
+                    // not-yet-registered proxy.
+                    email: otherUser?.email ||
+                        (viewerIsGrantor ? connection.proxyEmail : null) ||
+                        "",
+                    firstName: otherProfile?.firstName || "",
+                    lastName: otherProfile?.lastName || "",
+                    city: otherProfile?.city || "",
+                    state: otherProfile?.state || "",
+                    imgUrl: otherProfile?.imgUrl || "",
+                },
             };
         });
         return {
             status: "success",
-            message: "Connections retrieved successfully",
-            data: shaped,
+            data: formattedConnections,
         };
     }
     catch (error) {
         return {
             status: "failed",
-            message: error.message || "Something went wrong",
+            message: error?.message || "Unable to retrieve connections.",
         };
     }
 };
@@ -246,48 +301,70 @@ exports.getConnectionsForUserService = getConnectionsForUserService;
 // }
 // check if connection exist, check limit, if (no) to both then create connection request
 const sendConnectionRequestService = async (req) => {
-    const currentUserId = req.user?.id;
-    // const body = req.body.body;
-    const proxyEmail = req.body.proxyEmail;
-    const proxyId = req.body.proxyUserId;
-    console.log("got the info:", proxyEmail, proxyId);
     try {
-        // console.log("user info:", req.body);
+        const currentUserId = req.user?.id;
+        const proxyEmail = String(req.body?.proxyEmail || "")
+            .trim()
+            .toLowerCase();
+        const proxyUserId = String(req.body?.proxyUserId || "").trim();
         if (!currentUserId) {
-            return { ok: false, message: "Current user not found" };
+            return {
+                status: "failed",
+                message: "Current user not found.",
+            };
         }
-        const currentUser = await connection_model_1.default.findOne({
-            grantorId: currentUserId,
-            proxyEmail: proxyEmail,
-        });
-        if (currentUser) {
-            return { ok: false, message: "You're already connected to this user" };
+        if (!proxyEmail || !proxyUserId) {
+            return {
+                status: "failed",
+                message: "A proxy email and proxy user ID are required.",
+            };
         }
-        const activeProxyCount = await connection_model_1.default.countDocuments({
+        const existingConnection = await connection_model_1.default.findOne({
             grantorId: currentUserId,
-            status: { $in: ["active", "invited"] },
+            proxyUserId,
+            status: {
+                $in: ["invited", "active"],
+            },
+        }).lean();
+        if (existingConnection) {
+            return {
+                status: "failed",
+                message: "You are already connected to or have invited this person.",
+            };
+        }
+        const proxyGrantorCount = await connection_model_1.default.countDocuments({
+            proxyUserId,
+            status: {
+                $in: ["invited", "active"],
+            },
         });
-        if (activeProxyCount >= 2) {
-            return { ok: false, message: "You can only have 2 proxies" };
+        if (proxyGrantorCount >= 2) {
+            return {
+                status: "failed",
+                message: "This proxy already has 2 grantors.",
+            };
         }
         const connection = await connection_model_1.default.create({
             grantorId: currentUserId,
-            proxyEmail: proxyEmail,
-            proxyUserId: proxyId, // will be set when proxy finishes signup
+            proxyEmail,
+            proxyUserId,
             status: "invited",
             otpPurpose: null,
         });
-        console.log("new connection request:", connection);
         return {
             status: "success",
-            message: "Connection request sent successfully",
-            connection,
+            message: "Connection request sent successfully.",
+            data: {
+                connection,
+            },
         };
     }
     catch (error) {
+        console.error("sendConnectionRequestService error:", error);
         return {
             status: "failed",
-            message: error.message || "Something went wrong",
+            message: error?.message ||
+                "Unable to send connection request.",
         };
     }
 };
@@ -299,9 +376,13 @@ const createProxyConnectionService = async (req) => {
         const email = String(req.body.email || "").trim().toLowerCase();
         const grantorName = req.body.grantorFullname || "Someone";
         const verifyLink = `${frontendUrl}/proxy-signup?email=${encodeURIComponent(email)}`;
-        // if (!currentUserId) {
-        //   return { status: "failed", message: "Unauthorized" };
-        // }
+        const restriction = await (0, accountRestriction_1.assertUserNotRestricted)(currentUserId);
+        if (!restriction.allowed) {
+            return {
+                status: "failed",
+                message: restriction.message,
+            };
+        }
         if (!email) {
             return { status: "failed", message: "Proxy email is required" };
         }
@@ -460,13 +541,13 @@ const acceptProxyDirectService = async (req) => {
     if (!proxyId) {
         return { status: "failed", message: "Unauthorized" };
     }
-    if (!connectionId || !mongoose_1.default.Types.ObjectId.isValid(connectionId)) {
+    if (!connectionId || !mongoose_2.default.Types.ObjectId.isValid(connectionId)) {
         return { status: "failed", message: "Invalid connection ID" };
     }
     try {
         const connection = await connection_model_1.default.findOneAndUpdate({
-            proxyUserId: new mongoose_1.default.Types.ObjectId(proxyId),
-            _id: new mongoose_1.default.Types.ObjectId(connectionId),
+            proxyUserId: new mongoose_2.default.Types.ObjectId(proxyId),
+            _id: new mongoose_2.default.Types.ObjectId(connectionId),
         }, {
             $set: {
                 status: "active",
@@ -483,7 +564,7 @@ const acceptProxyDirectService = async (req) => {
         const proxyIdStr = connection.proxyUserId.toString();
         // Count active proxies for this grantor
         const activeConnections = await connection_model_1.default.find({
-            grantorId: new mongoose_1.default.Types.ObjectId(grantorId),
+            grantorId: new mongoose_2.default.Types.ObjectId(grantorId),
             status: "active",
             acceptedAt: { $exists: true, $ne: null },
         })
@@ -528,7 +609,7 @@ const acceptProxyDirectService = async (req) => {
         });
         // Update checklist (if exists)
         const existingChecklist = await checklist_model_1.default.findOne({
-            userId: new mongoose_1.default.Types.ObjectId(grantorId),
+            userId: new mongoose_2.default.Types.ObjectId(grantorId),
         });
         if (!existingChecklist) {
             return {
@@ -539,9 +620,9 @@ const acceptProxyDirectService = async (req) => {
         }
         const primaryProxyId = activeConnections.find(c => c.proxyRole === "primary")?.proxyUserId?.toString() || null;
         const secondaryProxyId = activeConnections.find(c => c.proxyRole === "secondary")?.proxyUserId?.toString() || null;
-        const updatedChecklist = await checklist_model_1.default.findOneAndUpdate({ userId: new mongoose_1.default.Types.ObjectId(grantorId) }, {
-            primaryProxyId: primaryProxyId ? new mongoose_1.default.Types.ObjectId(primaryProxyId) : null,
-            secondaryProxyId: secondaryProxyId ? new mongoose_1.default.Types.ObjectId(secondaryProxyId) : null,
+        const updatedChecklist = await checklist_model_1.default.findOneAndUpdate({ userId: new mongoose_2.default.Types.ObjectId(grantorId) }, {
+            primaryProxyId: primaryProxyId ? new mongoose_2.default.Types.ObjectId(primaryProxyId) : null,
+            secondaryProxyId: secondaryProxyId ? new mongoose_2.default.Types.ObjectId(secondaryProxyId) : null,
         }, { new: true });
         return {
             status: "success",

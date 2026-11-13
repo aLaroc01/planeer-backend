@@ -20,6 +20,8 @@ router.put("/ProfileUpdate", auth_middleware_1.auth, user_controller_1.userSelfU
 router.get("/GetAllProfile", auth_middleware_1.auth, user_controller_1.GetAllProfile);
 // GET request route for search
 router.get("/search", auth_middleware_1.auth, user_controller_1.searchUsersController);
+// get account status
+router.get("/account-status", auth_middleware_1.auth, user_controller_1.getAccountStatus);
 // router.get("/alldata-percentage/:userId",auth, alldatapercentage);
 // proxyset user
 router.post("/proxyset/:proxysetId", auth_middleware_1.auth, user_controller_1.ProxysetController);
@@ -31,7 +33,7 @@ router.get("/alluser-data", auth_middleware_1.auth, user_controller_1.getAllOwnU
 router.get("/alluser-set-data", auth_middleware_1.auth, user_controller_1.getUsersWhoAddedMeAsProxyController);
 // GET /api/users/my-proxy-users?userId=...
 router.get("/my-proxy-users", auth_middleware_1.auth, user_controller_1.getUsersWhoSetMyProxy);
-//admin routes
+// ADMIN ROUTES
 // admin Registration 
 router.post("/adminregister", user_controller_1.registerUser);
 // admin  routes
@@ -44,18 +46,18 @@ router.post("/codeverify", user_controller_1.codeverify);
 router.post("/forgetPassword", user_controller_1.forgetPassword);
 // User List with Pagination
 // router.get("/pagenationlist/:pageNo/:perPage/:searchKeyword",auth,isAdmin, UserList);
-router.get("/pagenationlist", auth_middleware_1.auth, auth_middleware_1.isAdmin, user_controller_1.UserList);
+router.get("/pagenationlist", auth_middleware_1.auth, auth_middleware_1.isAdminOrSuperAdmin, user_controller_1.UserList);
 // New Users in Last 10 Days
-router.get("/new-user-last", auth_middleware_1.auth, auth_middleware_1.isAdmin, user_controller_1.getNewUsersLast10Days);
+router.get("/new-user-last", auth_middleware_1.auth, auth_middleware_1.isAdminOrSuperAdmin, user_controller_1.getNewUsersLast10Days);
 // Update User by Admin
-router.put("/updateUser/:id", auth_middleware_1.auth, auth_middleware_1.isAdmin, user_controller_1.updateUserController);
+router.put("/updateUser/:id", auth_middleware_1.auth, auth_middleware_1.isAdminOrSuperAdmin, user_controller_1.updateUserController);
 // User Analysis
-router.get("/users/analysis", auth_middleware_1.auth, auth_middleware_1.isAdmin, user_controller_1.UserAnalysisController.getAnalysis);
+router.get("/users/analysis", auth_middleware_1.auth, auth_middleware_1.isAdminOrSuperAdmin, user_controller_1.UserAnalysisController.getAnalysis);
 //count
-router.get("/counts-user-report", auth_middleware_1.auth, auth_middleware_1.isAdmin, user_controller_1.getCounts);
-router.delete("/deleteUser/:id", auth_middleware_1.auth, auth_middleware_1.isAdmin, user_controller_1.adminDeleteUser);
+router.get("/counts-user-report", auth_middleware_1.auth, auth_middleware_1.isAdminOrSuperAdmin, user_controller_1.getCounts);
+router.delete("/deleteUser/:id", auth_middleware_1.auth, auth_middleware_1.isAdminOrSuperAdmin, user_controller_1.adminDeleteUser);
 // User Profile Update
-router.put("/adminUpdateUser/:id", auth_middleware_1.auth, auth_middleware_1.isAdmin, user_controller_1.adminUpdateUser);
+router.put("/adminUpdateUser/:id", auth_middleware_1.auth, auth_middleware_1.isAdminOrSuperAdmin, user_controller_1.adminUpdateUser);
 // system performance api 
-router.get("/performance", auth_middleware_1.auth, auth_middleware_1.isAdmin, user_controller_1.getSystemPerformance);
+router.get("/performance", auth_middleware_1.auth, auth_middleware_1.isAdminOrSuperAdmin, user_controller_1.getSystemPerformance);
 exports.userRoutes = router;

@@ -18,11 +18,11 @@ router.get('/cancel', subscriptions_controller_1.SubscriptionController.orderCan
 router.post('/create-checkout-session/:id', auth_middleware_1.auth, subscriptions_controller_1.SubscriptionController.createCheckoutSession);
 router.post('/update/:id', auth_middleware_1.auth, subscriptions_controller_1.SubscriptionController.updateSubscription);
 router.delete('/subscription/cancel/:id', subscriptions_controller_1.SubscriptionController.cancelSubscription);
-// router.get('/monthly-earnings-stats',auth,isAdmin,SubscriptionController.monthlyEarningsStats);
+router.get('/monthly-earnings-stats', auth_middleware_1.auth, auth_middleware_1.isAdmin, subscriptions_controller_1.SubscriptionController.monthlyEarningsStats);
 router.get('/subscriptions/stats', auth_middleware_1.auth, auth_middleware_1.isAdmin, subscriptions_controller_1.SubscriptionController.getMonthlyRevenueController);
 // Example of protected route using subscriptionGuard
 router.get('/premium-content', auth_middleware_1.auth, subscriptionGuard_1.subscriptionGuard, (req, res) => {
     res.send('This is premium content for active subscribers only.');
 });
-router.post('/stripe/webhook', express_1.default.raw({ type: 'application/json' }), subscriptions_controller_1.stripeWebhookHandler);
+router.post('/stripe/webhook', subscriptions_controller_1.stripeWebhookHandler);
 exports.SubscriptionRoutes = router;

@@ -3,10 +3,43 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteChecklist = exports.updateChecklist = exports.updateChecklistProxy = exports.getChecklistByCurrentUser = exports.createChecklist = void 0;
+exports.deleteChecklist = exports.updateChecklist = exports.updateChecklistProxy = exports.getChecklistByCurrentUser = exports.createChecklist = exports.GetChecklistForProxy = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
 const checklist_service_1 = __importDefault(require("./checklist.service"));
 const checklist_model_1 = __importDefault(require("./checklist.model"));
+const checklist_service_2 = require("./checklist.service");
+const GetChecklistForProxy = async (req, res) => {
+    const proxyUserId = req.user?.id;
+    const grantorId = String(req.params.grantorId || "").trim();
+    if (!proxyUserId) {
+        return res.status(401).json({
+            status: "failed",
+            message: "Unauthorized access",
+        });
+    }
+    if (!grantorId) {
+        return res.status(400).json({
+            status: "failed",
+            message: "Grantor ID is required",
+        });
+    }
+    try {
+        const checklist = await (0, checklist_service_2.getChecklistForProxy)(proxyUserId, grantorId);
+        return res.status(200).json(checklist);
+    }
+    catch (error) {
+        const statusCode = error?.statusCode || 500;
+        if (statusCode >= 500) {
+            console.error("Unable to get proxy checklist information:", error);
+        }
+        return res.status(statusCode).json({
+            status: "failed",
+            message: error?.message ||
+                "Unable to load checklist information",
+        });
+    }
+};
+exports.GetChecklistForProxy = GetChecklistForProxy;
 const checklistService = new checklist_service_1.default();
 const getAuthenticatedUserId = (req) => {
     return req.user?.id;

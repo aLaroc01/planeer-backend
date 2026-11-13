@@ -97,9 +97,6 @@ const corsOptions: CorsOptions = {
 
 app.use(cors(corsOptions));
 
-// Explicitly finish all CORS preflights before they reach rate limits,
-// IP rules, file uploads, auth middleware, or API routes.
-app.options(/.*/, cors(corsOptions));
 
 /*
 |--------------------------------------------------------------------------

@@ -1,7 +1,35 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MedicalGetService = exports.calculateMedicalDataCompleteness = exports.MedicalUpdateService = void 0;
+exports.MedicalGetService = exports.MedicalUpdateService = exports.getMedicalForProxy = void 0;
 const medical_model_1 = require("./medical.model");
+const mongoose_1 = require("mongoose");
+const proxyAccess_service_1 = require("../services/proxyAccess.service");
+const getMedicalForProxy = async (proxyUserId, grantorId) => {
+    const access = await (0, proxyAccess_service_1.requireActiveProxyConnection)({
+        proxyUserId,
+        grantorId,
+    });
+    if (!access.ok) {
+        const error = new Error(access.message);
+        Object.assign(error, {
+            statusCode: access.statusCode,
+        });
+        throw error;
+    }
+    const medicalData = await medical_model_1.MedicalInfoModel.findOne({
+        userID: new mongoose_1.Types.ObjectId(grantorId),
+    })
+        .select("userID items")
+        .lean();
+    return {
+        status: "success",
+        data: medicalData || {
+            userID: grantorId,
+            items: [],
+        },
+    };
+};
+exports.getMedicalForProxy = getMedicalForProxy;
 const MedicalUpdateService = async (req) => {
     try {
         let user_id = req.user?.id;
@@ -34,32 +62,6 @@ const MedicalUpdateService = async (req) => {
     }
 };
 exports.MedicalUpdateService = MedicalUpdateService;
-const calculateMedicalDataCompleteness = async (req, res) => {
-    try {
-        const { healthInsurance, supplementalInsurance, medications, knownAilments } = req.body;
-        const allFields = [
-            healthInsurance,
-            supplementalInsurance,
-            medications,
-            knownAilments
-        ];
-        const filledFields = allFields.filter(field => field && field.trim() !== "").length;
-        const totalFields = allFields.length;
-        const completenessPercentage = (filledFields / totalFields) * 100;
-        return res.status(200).json({
-            status: "success",
-            message: `Data completeness: ${completenessPercentage.toFixed(2)}%`,
-            completenessPercentage: completenessPercentage.toFixed(2),
-            filledFields,
-            totalFields,
-        });
-    }
-    catch (error) {
-        console.error(error);
-        return res.status(500).json({ status: "failed", message: "Server error", data: error });
-    }
-};
-exports.calculateMedicalDataCompleteness = calculateMedicalDataCompleteness;
 const MedicalGetService = async (req) => {
     try {
         const user_id = req.user?.id;
