@@ -1,8 +1,12 @@
 import { NextFunction, Request, Response } from "express";
-import { adminDeleteUserService, adminEmailService, adminLoginService, adminUpdateUserService, codeVerification,  existingUser,  
-   getAllOwnUserDataService, getAllUserDataService,  getallUsers, getCountsService, getNewUsersLast10DaysService, getprofileService, 
-   getProxysetData, getUsersWhoAddedMeAsProxyService, getUsersWhoSetMyProxyService,LoginInUser,  ProxysetService, searchUsersService,  
-   updatePassword, updateUserService, UserAnalysisService, userSelfUpdateService, } from "./user.service";
+import { adminDeleteUserService, adminEmailService, adminLoginService, adminUpdateUserService,
+  codeVerification,  existingUser, getAllOwnUserDataService, getAllUserDataService,  getallUsers, 
+  getCountsService, getNewUsersLast10DaysService, getprofileService, getProxysetData, 
+  getUsersWhoAddedMeAsProxyService, getUsersWhoSetMyProxyService,LoginInUser,  
+  ProxysetService, searchUsersService,  updatePassword, UserAnalysisService, 
+  userSelfUpdateService, createAccountStatusRequestService, reviewAccountStatusRequestService,
+  listAccountStatusRequestsService, changeAccountStatusService,
+   } from "./user.service";
 import { PlanStatus, Role } from "./user.interface";
 import { checkActiveSubscription } from "../subscriptions-information/subscriptions.service";
 import { User } from "./user.model";
@@ -336,17 +340,15 @@ export const getAllProxysetController = async (req: Request, res: Response) => {
 
 
 
+// Admin creates an account status request for a user
+export const createAccountStatusRequest = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const result = await createAccountStatusRequestService(req);
 
-
-
-
-
-
-
-
-
-
-
+  res.status(result.statusCode).json(result);
+};
 
 
 
@@ -417,6 +419,18 @@ export const forgetPassword = async (req: Request, res: Response, next: NextFunc
     next(error);
   }
 };
+
+
+
+export const reviewAccountStatusRequest = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const result = await reviewAccountStatusRequestService(req);
+
+  res.status(result.statusCode).json(result);
+};
+
 
 
 
@@ -510,12 +524,18 @@ export const getNewUsersLast10Days = async (req: Request, res: Response) => {
 
 
 
-// Admin updates a user's profile
-  export const updateUserController = async (req:Request,res:Response) => {
-    let result = await updateUserService(req);
-    res.json(result);
-
-  }
+// Retired legacy endpoint.
+// Account-status changes must use the dedicated status workflow.
+export const updateUserController = (
+  _req: Request,
+  res: Response,
+): void => {
+  res.status(410).json({
+    status: "failed",
+    message:
+      "This update endpoint has been retired. Use the supported user-management actions.",
+  });
+};
 
 
     
@@ -748,6 +768,8 @@ export const getUsersWhoAddedMeAsProxyController = async (
 
 
 
+
+
 // Get users for whom the logged-in user has set as a proxy
 export const getUsersWhoSetMyProxy = async (
   req: Request,
@@ -888,20 +910,42 @@ export const getSystemPerformance = async (req: Request, res: Response, next: Ne
 
 
 
+// Controller to list account status requests for a user.
+export const listAccountStatusRequests = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const result = await listAccountStatusRequestsService(req);
+
+  res.status(result.statusCode).json(result);
+};
+
+// Controller to change the account status of a user by a super-admin.
+export const changeAccountStatus = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const result = await changeAccountStatusService(req);
+
+  res.status(result.statusCode).json(result);
+};
+
+
+
 
 // Admin updates a user's profile
 export const adminUpdateUser = async (
   req: Request,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   const result = await adminUpdateUserService(req);
 
-  if (result?.status === "success") {
-    logSuccess(req, "Admin updated user data", {
+  if (result.status === "success") {
+    logSuccess(req, "Admin processed user profile update", {
       adminId: req.user?.id,
       updatedUserId: req.params.id,
     });
   }
 
-  res.json(result);
+  res.status(result.statusCode).json(result);
 };

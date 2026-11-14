@@ -7,6 +7,7 @@ exports.isCorporate = exports.isAdminOrSuperAdmin = exports.isSuperAdmin = expor
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const config_1 = require("../config");
 const user_model_1 = require("../modules/auth/user.model");
+const user_interface_1 = require("../modules/auth/user.interface");
 const auth = async (req, res, next) => {
     try {
         const authorization = req.headers.authorization;
@@ -24,6 +25,12 @@ const auth = async (req, res, next) => {
             id: user._id,
             role: user.role,
         };
+        if (user.accountStatus === user_interface_1.AccountStatus.SUSPENDED ||
+            user.accountStatus === user_interface_1.AccountStatus.DEACTIVATED) {
+            return res.status(403).json({
+                message: "This account is not currently permitted to access the application.",
+            });
+        }
         next();
     }
     catch (error) {

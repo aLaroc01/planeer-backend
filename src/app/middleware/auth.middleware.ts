@@ -3,6 +3,7 @@ import { NextFunction, Request, Response } from "express";
 import  jwt  from 'jsonwebtoken';
 import { config } from "../config";
 import { User } from "../modules/auth/user.model";
+import { AccountStatus } from "../modules/auth/user.interface";
 
 
 interface AuthenticatedRequest extends Request {
@@ -20,6 +21,8 @@ export const auth = async(req:AuthenticatedRequest, res:Response, next:NextFunct
     return res.status(401).json({ message: "Unauthorized access" });
   }
 
+
+
     const decoded = jwt.verify(token, config.jwt_secret as string)  as { userId: string, role: string };
     const user =await User.findById(decoded.userId)
     if (!user) {
@@ -29,6 +32,14 @@ export const auth = async(req:AuthenticatedRequest, res:Response, next:NextFunct
         _id: user._id,
         id: user._id,
         role: user.role,
+    }
+    if (
+      user.accountStatus === AccountStatus.SUSPENDED ||
+      user.accountStatus === AccountStatus.DEACTIVATED
+    ) {
+      return res.status(403).json({
+        message: "This account is not currently permitted to access the application.",
+      });
     }
     next();
   } catch (error) {

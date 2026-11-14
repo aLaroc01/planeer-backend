@@ -33,7 +33,6 @@ const canAddProxy = async (grantorId, proxyUserId) => {
 const getConnectionsForUser = async (req, res) => {
     try {
         const result = await (0, connection_service_1.getConnectionsForUserService)(req);
-        console.log("getConnectionsForUser result:", result.data);
         return res.status(result.status === "success" ? 200 : 400).json(result);
     }
     catch (error) {
@@ -109,7 +108,6 @@ exports.cancelConnectionDirectly = cancelConnectionDirectly;
 const denyProxyDirectly = async (req, res) => {
     try {
         const result = await (0, connection_service_1.denyProxyDirectService)(req);
-        // console.log("updated connection id:", result.data);
         const statusCode = (result.status === "success") ? 200 : 400; // Map "success" to 200, anything else to 400
         return res.status(statusCode).json(result);
     }
@@ -125,7 +123,6 @@ exports.denyProxyDirectly = denyProxyDirectly;
 const acceptProxyDirectly = async (req, res) => {
     try {
         const result = await (0, connection_service_1.acceptProxyDirectService)(req);
-        // console.log("updated connection id:", result, ",", req.body.connId);
         const statusCode = (result.status === "success") ? 200 : 400; // Map "success" to 200, anything else to 400
         return res.status(statusCode).json(result);
     }

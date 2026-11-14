@@ -4,6 +4,7 @@ import {
   IAuditLog,
 } from "./auditLog.interface";
 
+
 const auditLogSchema = new Schema<IAuditLog>(
   {
     actorId: {
@@ -40,6 +41,18 @@ const auditLogSchema = new Schema<IAuditLog>(
     after: {
       role: { type: String },
       accountStatus: { type: String },
+    },
+    reason: {
+      type: String,
+      trim: true,
+      maxlength: 2000,
+    },
+
+    statusChangeRequestId: {
+      type: Schema.Types.ObjectId,
+      ref: "AccountStatusRequest",
+      default: null,
+      index: true,
     },
   },
   {

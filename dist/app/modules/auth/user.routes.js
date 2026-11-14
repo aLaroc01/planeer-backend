@@ -50,14 +50,22 @@ router.get("/pagenationlist", auth_middleware_1.auth, auth_middleware_1.isAdminO
 // New Users in Last 10 Days
 router.get("/new-user-last", auth_middleware_1.auth, auth_middleware_1.isAdminOrSuperAdmin, user_controller_1.getNewUsersLast10Days);
 // Update User by Admin
-// router.put("/updateUser/:id",auth, isAdminOrSuperAdmin, updateUserController)
+router.put("/updateUser/:id", auth_middleware_1.auth, auth_middleware_1.isAdminOrSuperAdmin, user_controller_1.updateUserController);
 // User Analysis
 router.get("/users/analysis", auth_middleware_1.auth, auth_middleware_1.isAdminOrSuperAdmin, user_controller_1.UserAnalysisController.getAnalysis);
 //count
 router.get("/counts-user-report", auth_middleware_1.auth, auth_middleware_1.isAdminOrSuperAdmin, user_controller_1.getCounts);
 router.delete("/deleteUser/:id", auth_middleware_1.auth, auth_middleware_1.isAdminOrSuperAdmin, user_controller_1.adminDeleteUser);
 // User Profile Update
-router.put("/adminUpdateUser/:id", auth_middleware_1.auth, auth_middleware_1.isAdminOrSuperAdmin, user_controller_1.adminUpdateUser);
+router.put("/adminUpdateUser/:id", auth_middleware_1.auth, auth_middleware_1.isSuperAdmin, user_controller_1.adminUpdateUser);
 // system performance api 
 router.get("/performance", auth_middleware_1.auth, auth_middleware_1.isAdminOrSuperAdmin, user_controller_1.getSystemPerformance);
+// Admin creates an account status request for a user
+router.post("/users/:id/account-status-requests", auth_middleware_1.auth, auth_middleware_1.isAdminOrSuperAdmin, user_controller_1.createAccountStatusRequest);
+// Review account status request route
+router.patch("/account-status-requests/:requestId/review", auth_middleware_1.auth, auth_middleware_1.isSuperAdmin, user_controller_1.reviewAccountStatusRequest);
+// List account status requests route
+router.get("/account-status-requests", auth_middleware_1.auth, auth_middleware_1.isAdminOrSuperAdmin, user_controller_1.listAccountStatusRequests);
+// Change account status route
+router.patch("/users/:id/account-status", auth_middleware_1.auth, auth_middleware_1.isSuperAdmin, user_controller_1.changeAccountStatus);
 exports.userRoutes = router;

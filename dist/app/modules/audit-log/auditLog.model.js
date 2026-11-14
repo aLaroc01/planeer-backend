@@ -34,6 +34,17 @@ const auditLogSchema = new mongoose_1.Schema({
         role: { type: String },
         accountStatus: { type: String },
     },
+    reason: {
+        type: String,
+        trim: true,
+        maxlength: 2000,
+    },
+    statusChangeRequestId: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: "AccountStatusRequest",
+        default: null,
+        index: true,
+    },
 }, {
     timestamps: true,
     versionKey: false,

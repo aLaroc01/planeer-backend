@@ -7,4 +7,7 @@ var AuditAction;
     AuditAction["USER_DELETED"] = "USER_DELETED";
     AuditAction["USER_STATUS_CHANGED"] = "USER_STATUS_CHANGED";
     AuditAction["USER_ROLE_CHANGED"] = "USER_ROLE_CHANGED";
+    AuditAction["USER_STATUS_CHANGE_REQUESTED"] = "USER_STATUS_CHANGE_REQUESTED";
+    AuditAction["USER_STATUS_REQUEST_APPROVED"] = "USER_STATUS_REQUEST_APPROVED";
+    AuditAction["USER_STATUS_REQUEST_REJECTED"] = "USER_STATUS_REQUEST_REJECTED";
 })(AuditAction || (exports.AuditAction = AuditAction = {}));

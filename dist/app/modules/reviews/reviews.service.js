@@ -21,7 +21,6 @@ const ReviewService = async (req) => {
         };
     }
     catch (error) {
-        console.log("Error creating report:", error);
         return {
             status: false,
             message: "Failed to create report",

@@ -85,7 +85,6 @@ const getPackageFromDB = async (queryParms) => {
     };
     const queryBuilder = new QueryBuilder_1.default(package_model_1.Package.find(query), queryParms);
     const packages = await queryBuilder.filter().sort().paginate().fields().sort().modelQuery.exec();
-    console.log(packages);
     const meta = await queryBuilder.countTotal();
     return {
         packages,

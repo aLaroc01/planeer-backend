@@ -159,16 +159,13 @@ exports.canAddGrantorForProxy = canAddGrantorForProxy;
 //       };
 //     }
 //     const proxyUserIds = connections?.map((conn) => conn.proxyUserId).filter(Boolean) || [];
-//     // console.log("Proxy user IDs to fetch profiles for:", proxyUserIds);
 //     // 3) Get profiles whose userID is in proxyUserIds
 //     const proxyProfiles = await ProfileModel.find({
 //       userID: { $in: proxyUserIds },
 //     }).select("userId firstName lastName mainRole address city state");
-//     // console.log("Proxy profiles found:", proxyProfiles); // works
 //     const userImg = await User.findOne({_id: proxyUserIds, }).select(
 //     "imgUrl"
 //   );
-//   console.log("user image link/url here", userImg);
 //     // Build a map: userID -> profile
 //     const profileMap = new Map(
 //       proxyProfiles.map((p) => [String(p.userID), p])
@@ -600,7 +597,6 @@ const denyProxyDirectService = async (req) => {
                 acceptedAt: new Date(),
             },
         });
-        // console.log("deny updated connection:", connection);
         return {
             status: "success",
             message: "Proxy connection was rejected!",
@@ -619,7 +615,6 @@ exports.denyProxyDirectService = denyProxyDirectService;
 const acceptProxyDirectService = async (req) => {
     const proxyId = req.user?.id;
     const connectionId = req.body.connId;
-    // console.log("connections:", connectionId);
     if (!proxyId) {
         return { status: "failed", message: "Unauthorized" };
     }
@@ -768,7 +763,6 @@ const acceptProxyInviteService = async (req) => {
     try {
         const proxyUserId = req.user?.id;
         const proxyEmail = String(req.body.email || req.body.proxyEmail || "").trim().toLowerCase();
-        console.log("Accepting proxy invite for email:", proxyEmail, "and user ID:", proxyUserId);
         if (!proxyUserId) {
             return { status: "failed", message: "Unauthorized" };
         }

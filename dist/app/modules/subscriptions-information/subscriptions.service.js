@@ -96,11 +96,6 @@ const getPackageId = async (subscription) => {
     if (!packageDoc) {
         throw new AppError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, `No active Planeer package matches Stripe Price ID: ${stripePriceId}`);
     }
-    console.log("Resolved Planeer package from Stripe Price:", {
-        stripePriceId,
-        packageId: String(packageDoc._id),
-        packageTitle: packageDoc.title,
-    });
     return String(packageDoc._id);
 };
 const getStripePriceId = (subscription) => {
@@ -730,7 +725,6 @@ const subscriptionsFromDB = async (query) => {
 //  */
 // export const startSubscriptionExpireCron = () => {
 //   cron.schedule('0 0 * * *', async () => {
-//     console.log('Running subscription expire cron');
 //     await Subscription.updateMany(
 //       { status: 'active', currentPeriodEnd: { $lt: new Date() } },
 //       { $set: { status: 'expired' } },

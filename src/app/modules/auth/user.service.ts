@@ -18,6 +18,12 @@ import { ProxyUser, ProxyUserResponse, AccountStatus, Role } from "./user.interf
 import { AuditLog } from "../audit-log/auditLog.model";
 import { AuditAction } from "../audit-log/auditLog.interface";
 import { http } from "winston";
+import { isValidObjectId } from "mongoose";
+import { AccountStatusRequest } from "../account-status-request/accountStatusRequest.model";
+import {
+  AccountStatusRequestStatus,
+  RequestedAccountStatus,
+} from "../account-status-request/accountStatusRequest.interface";
 // import { User } from "./user.model";
 // import { StrictMode, use } from "react";
 
@@ -54,7 +60,206 @@ declare global {
 
 // }
 
+class AccountStatusWorkflowError extends Error {
+  constructor(
+    public readonly statusCode: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "AccountStatusWorkflowError";
+  }
+}
 
+export const createAccountStatusRequestService = async (
+  req: Request,
+) => {
+  try {
+    const actorId = req.user?.id;
+    const targetUserId = req.params.id;
+
+    if (!actorId) {
+      throw new AccountStatusWorkflowError(
+        401,
+        "Authentication is required.",
+      );
+    }
+
+    if (
+      typeof targetUserId !== "string" ||
+      !isValidObjectId(targetUserId)
+    ) {
+      throw new AccountStatusWorkflowError(
+        400,
+        "A valid user id is required.",
+      );
+    }
+
+    const requestedStatus = req.body?.requestedStatus;
+
+    const requestableStatuses: RequestedAccountStatus[] = [
+      AccountStatus.ACTIVE,
+      AccountStatus.SUSPENDED,
+      AccountStatus.DEACTIVATED,
+    ];
+
+    if (
+      typeof requestedStatus !== "string" ||
+      !requestableStatuses.includes(
+        requestedStatus as RequestedAccountStatus,
+      )
+    ) {
+      throw new AccountStatusWorkflowError(
+        400,
+        "Requested status must be ACTIVE, SUSPENDED, or DEACTIVATED.",
+      );
+    }
+
+    const internalNote =
+      typeof req.body?.internalNote === "string"
+        ? req.body.internalNote.trim()
+        : "";
+
+    if (internalNote.length < 10 || internalNote.length > 2000) {
+      throw new AccountStatusWorkflowError(
+        400,
+        "An internal note between 10 and 2,000 characters is required.",
+      );
+    }
+
+    const createdRequest = await User.db.transaction(
+      async (session) => {
+        // Re-read the actor rather than trusting submitted identity/role.
+        const actor = await User.findById(actorId)
+          .select("_id role accountStatus")
+          .session(session);
+
+        if (
+          !actor ||
+          actor.role !== Role.ADMIN ||
+          actor.accountStatus !== AccountStatus.ACTIVE
+        ) {
+          throw new AccountStatusWorkflowError(
+            403,
+            "An active admin account is required to submit a request.",
+          );
+        }
+
+        // Staff accounts are outside this customer-status workflow.
+        const target = await User.findOne({
+          _id: targetUserId,
+          role: { $in: [Role.USER, Role.PROXY] },
+        })
+          .select("_id accountStatus")
+          .session(session);
+
+        if (!target) {
+          throw new AccountStatusWorkflowError(
+            404,
+            "An eligible user account was not found.",
+          );
+        }
+
+        if (target.accountStatus === requestedStatus) {
+          throw new AccountStatusWorkflowError(
+            409,
+            "The account already has the requested status.",
+          );
+        }
+
+        const pendingRequest = await AccountStatusRequest.findOne({
+          targetUserId: target._id,
+          status: AccountStatusRequestStatus.PENDING,
+        })
+          .select("_id")
+          .session(session);
+
+        if (pendingRequest) {
+          throw new AccountStatusWorkflowError(
+            409,
+            "This account already has a pending status-change request.",
+          );
+        }
+
+        const [request] = await AccountStatusRequest.create(
+          [
+            {
+              targetUserId: target._id,
+              requestedBy: actor._id,
+              fromStatus: target.accountStatus,
+              requestedStatus,
+              internalNote,
+              status: AccountStatusRequestStatus.PENDING,
+            },
+          ],
+          { session },
+        );
+
+        await AuditLog.create(
+          [
+            {
+              actorId: actor._id,
+              targetUserId: target._id,
+              action: AuditAction.USER_STATUS_CHANGE_REQUESTED,
+
+              // No user fields have changed at submission time.
+              changedFields: [],
+
+              before: {
+                accountStatus: target.accountStatus,
+              },
+              after: {
+                accountStatus: target.accountStatus,
+              },
+
+              reason: internalNote,
+              statusChangeRequestId: request._id,
+            },
+          ],
+          { session },
+        );
+
+        return request.toObject();
+      },
+    );
+
+    return {
+      status: "success" as const,
+      statusCode: 201,
+      message: "Account-status request submitted for review.",
+      data: createdRequest,
+    };
+  } catch (error: unknown) {
+    if (error instanceof AccountStatusWorkflowError) {
+      return {
+        status: "failed" as const,
+        statusCode: error.statusCode,
+        message: error.message,
+      };
+    }
+
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === 11000
+    ) {
+      return {
+        status: "failed" as const,
+        statusCode: 409,
+        message:
+          "This account already has a pending status-change request.",
+      };
+    }
+
+    console.error("Account-status request submission failed:", error);
+
+    return {
+      status: "failed" as const,
+      statusCode: 500,
+      message: "Could not submit the account-status request.",
+    };
+  }
+};
 
 
 
@@ -1016,13 +1221,6 @@ export const getUserList = async (
 
 
 
-
-
-
-
-
-
-
 // "use Strict";
 export const getNewUsersLast10DaysService = async () => {
   const tenDaysAgo = new Date();
@@ -1036,216 +1234,907 @@ export const getNewUsersLast10DaysService = async () => {
 };
 
 
-
-
-
-export const updateUserService = async (req:Request) => { //this is different
+// Review account status request service
+export const reviewAccountStatusRequestService = async (
+  req: Request,
+) => {
   try {
-       let user_id=req.params.id;
-        let requestBody = req.body;
-     
-        await User.updateOne({_id: user_id}, requestBody, {upsert: true})
-        return ({status: true ,message:"User Update successfully"})
+    const actorId = req.user?.id;
+    const requestId = req.params.requestId;
 
-  } catch (error) {
-    return {status: false, data: error};
-  }
-}
-
-
-
-
-
-
-export const adminUpdateUserService = async (req: Request) => {
-  try {
-    const adminId = req.user?.id;
-    const adminRole = req.user?.role;
-    const userId = req.params.id;
-    const body = req.body ?? {};
-
-    if (!adminId) {
-      return {
-        status: "failed",
-        message: "Unauthorized",
-      };
+    if (!actorId) {
+      throw new AccountStatusWorkflowError(
+        401,
+        "Authentication is required.",
+      );
     }
 
-    const isSuperAdmin = adminRole === Role.SUPER_ADMIN;
-    const isAdmin = adminRole === Role.ADMIN;
-
-    if (!isAdmin && !isSuperAdmin) {
-      return {
-        status: "failed",
-        message: "Only admins and super admins can update users",
-      };
+    if (
+      typeof requestId !== "string" ||
+      !isValidObjectId(requestId)
+    ) {
+      throw new AccountStatusWorkflowError(
+        400,
+        "A valid request id is required.",
+      );
     }
 
-    if (!userId) {
-      return {
-        status: "failed",
-        message: "User id is required",
-      };
+    const decision = req.body?.decision;
+
+    if (
+      decision !== AccountStatusRequestStatus.APPROVED &&
+      decision !== AccountStatusRequestStatus.REJECTED
+    ) {
+      throw new AccountStatusWorkflowError(
+        400,
+        "Decision must be APPROVED or REJECTED.",
+      );
     }
 
-    const user = await User.findById(userId);
+    const reviewNote =
+      typeof req.body?.reviewNote === "string"
+        ? req.body.reviewNote.trim()
+        : "";
 
-    if (!user) {
-      return {
-        status: "failed",
-        message: "User not found",
-      };
+    if (reviewNote.length < 10 || reviewNote.length > 2000) {
+      throw new AccountStatusWorkflowError(
+        400,
+        "A review note between 10 and 2,000 characters is required.",
+      );
     }
 
-    const updates: Record<string, string> = {};
+    const isApproval =
+      decision === AccountStatusRequestStatus.APPROVED;
 
-    // Routine status changes only.
-    if (body.accountStatus !== undefined) {
-      if (
-        body.accountStatus !== AccountStatus.ACTIVE &&
-        body.accountStatus !== AccountStatus.PENDING_VERIFICATION
-      ) {
-        return {
-          status: "failed",
-          message:
-            "This endpoint only supports ACTIVE or PENDING_VERIFICATION",
-        };
-      }
+    const reviewedRequest = await User.db.transaction(
+      async (session) => {
+        const reviewer = await User.findById(actorId)
+          .select("_id role accountStatus")
+          .session(session);
 
-      // Prevent bypassing the separate restriction-management action.
-      if (
-        user.accountStatus === AccountStatus.SUSPENDED ||
-        user.accountStatus === AccountStatus.DEACTIVATED
-      ) {
-        return {
-          status: "failed",
-          message:
-            "Use the separate super-admin action to change a suspended or deactivated account",
-        };
-      }
+        if (
+          !reviewer ||
+          reviewer.role !== Role.SUPER_ADMIN ||
+          reviewer.accountStatus !== AccountStatus.ACTIVE
+        ) {
+          throw new AccountStatusWorkflowError(
+            403,
+            "An active super-admin account is required.",
+          );
+        }
 
-      updates.accountStatus = body.accountStatus;
-    }
+        const request = await AccountStatusRequest.findById(
+          requestId,
+        ).session(session);
 
-    if (body.phoneNumber !== undefined) {
-      if (typeof body.phoneNumber !== "string") {
-        return {
-          status: "failed",
-          message: "Phone number must be a string",
-        };
-      }
+        if (!request) {
+          throw new AccountStatusWorkflowError(
+            404,
+            "Account-status request not found.",
+          );
+        }
 
-      updates.phoneNumber = body.phoneNumber.trim();
-    }
+        if (
+          request.status !== AccountStatusRequestStatus.PENDING
+        ) {
+          throw new AccountStatusWorkflowError(
+            409,
+            "This request has already been reviewed.",
+          );
+        }
 
-    // Role changes remain super-admin-only.
-    if (body.role !== undefined) {
-      if (!isSuperAdmin) {
-        return {
-          status: "failed",
-          message: "Only a super admin can change user roles",
-        };
-      }
+        // Approval requires independent review.
+        // Rejection can also withdraw the reviewer's earlier request.
+        if (
+          isApproval &&
+          request.requestedBy.toString() ===
+            reviewer._id.toString()
+        ) {
+          throw new AccountStatusWorkflowError(
+            403,
+            "You cannot approve your own request. You may reject it to close it.",
+          );
+        }
 
-      const allowedRoles = [
-        Role.USER,
-        Role.PROXY,
-        Role.ADMIN,
-        Role.SUPER_ADMIN,
-      ];
+        // Load the target without filtering its role:
+        // rejection must work even if it became a staff account.
+        const target = await User.findById(
+          request.targetUserId,
+        )
+          .select("_id role accountStatus")
+          .session(session);
 
-      if (!allowedRoles.includes(body.role)) {
-        return {
-          status: "failed",
-          message: "Invalid role",
-        };
-      }
+        const beforeStatus = target?.accountStatus;
+        let afterStatus = beforeStatus;
 
-      if (
-        String(userId) === String(adminId) &&
-        body.role !== Role.SUPER_ADMIN
-      ) {
-        return {
-          status: "failed",
-          message: "You cannot remove your own super-admin role",
-        };
-      }
+        if (isApproval) {
+          if (!target) {
+            throw new AccountStatusWorkflowError(
+              409,
+              "The target account no longer exists. Reject this request to close it.",
+            );
+          }
 
-      updates.role = body.role;
-    }
+          if (
+            target.role !== Role.USER &&
+            target.role !== Role.PROXY
+          ) {
+            throw new AccountStatusWorkflowError(
+              409,
+              "The target is no longer an eligible customer account. Reject this request to close it.",
+            );
+          }
 
-    if (Object.keys(updates).length === 0) {
-      return {
-        status: "failed",
-        message: "No allowed fields were provided to update",
-      };
-    }
+          if (target.accountStatus !== request.fromStatus) {
+            throw new AccountStatusWorkflowError(
+              409,
+              "The account status changed after submission. Reject this request and submit a fresh request if needed.",
+            );
+          }
 
-    const before = {
-      role: user.role,
-      accountStatus: user.accountStatus,
-    };
+          if (
+            target.accountStatus === request.requestedStatus
+          ) {
+            throw new AccountStatusWorkflowError(
+              409,
+              "The account already has the requested status. Reject this request to close it.",
+            );
+          }
 
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { $set: updates },
-      {
-        new: true,
-        runValidators: true,
+          const updatedUser = await User.findOneAndUpdate(
+            {
+              _id: request.targetUserId,
+              role: { $in: [Role.USER, Role.PROXY] },
+              accountStatus: request.fromStatus,
+            },
+            {
+              $set: {
+                accountStatus: request.requestedStatus,
+              },
+            },
+            {
+              new: true,
+              runValidators: true,
+              session,
+            },
+          ).select("_id accountStatus");
+
+          if (!updatedUser) {
+            throw new AccountStatusWorkflowError(
+              409,
+              "The account changed during review. Refresh and review it again.",
+            );
+          }
+
+          afterStatus = updatedUser.accountStatus;
+        }
+
+        // Rejection reaches this point even if the target is
+        // deleted, is now staff, or has a different status.
+        const updatedRequest =
+          await AccountStatusRequest.findOneAndUpdate(
+            {
+              _id: request._id,
+              status: AccountStatusRequestStatus.PENDING,
+            },
+            {
+              $set: {
+                status: decision,
+                reviewedBy: reviewer._id,
+                reviewNote,
+                reviewedAt: new Date(),
+              },
+            },
+            {
+              new: true,
+              runValidators: true,
+              session,
+            },
+          );
+
+        if (!updatedRequest) {
+          throw new AccountStatusWorkflowError(
+            409,
+            "This request has already been reviewed.",
+          );
+        }
+
+        await AuditLog.create(
+          [
+            {
+              actorId: reviewer._id,
+
+              // Preserve the original target ID even when
+              // its user document no longer exists.
+              targetUserId: request.targetUserId,
+
+              action: isApproval
+                ? AuditAction.USER_STATUS_REQUEST_APPROVED
+                : AuditAction.USER_STATUS_REQUEST_REJECTED,
+
+              changedFields: [],
+
+              // Do not invent a current status for a deleted user.
+              before:
+                beforeStatus === undefined
+                  ? {}
+                  : { accountStatus: beforeStatus },
+
+              after:
+                afterStatus === undefined
+                  ? {}
+                  : { accountStatus: afterStatus },
+
+              reason: reviewNote,
+              statusChangeRequestId: request._id,
+            },
+          ],
+          { session },
+        );
+
+        if (isApproval) {
+          await AuditLog.create(
+            [
+              {
+                actorId: reviewer._id,
+                targetUserId: request.targetUserId,
+                action: AuditAction.USER_STATUS_CHANGED,
+                changedFields: ["accountStatus"],
+                before: {
+                  accountStatus: beforeStatus,
+                },
+                after: {
+                  accountStatus: afterStatus,
+                },
+                reason: reviewNote,
+                statusChangeRequestId: request._id,
+              },
+            ],
+            { session },
+          );
+        }
+
+        return updatedRequest.toObject();
       },
-    ).select(
-      "_id email phoneNumber role accountStatus planStatus lastLoginAt mfa.enabled createdAt updatedAt",
     );
 
-    if (!updatedUser) {
+    return {
+      status: "success" as const,
+      statusCode: 200,
+      message: isApproval
+        ? "Request approved and account status updated."
+        : "Request rejected and closed. No account was changed.",
+      data: reviewedRequest,
+    };
+  } catch (error: unknown) {
+    if (error instanceof AccountStatusWorkflowError) {
       return {
-        status: "failed",
-        message: "User not found after update",
+        status: "failed" as const,
+        statusCode: error.statusCode,
+        message: error.message,
       };
     }
 
-    const roleChanged =
-      updates.role !== undefined &&
-      updates.role !== before.role;
-
-    const accountStatusChanged =
-      updates.accountStatus !== undefined &&
-      updates.accountStatus !== before.accountStatus;
-
-    await AuditLog.create({
-      actorId: adminId,
-      targetUserId: userId,
-      action: roleChanged
-        ? AuditAction.USER_ROLE_CHANGED
-        : accountStatusChanged
-          ? AuditAction.USER_STATUS_CHANGED
-          : AuditAction.USER_UPDATED,
-      changedFields: Object.keys(updates),
-      before: {
-        role: before.role,
-        accountStatus: before.accountStatus,
-      },
-      after: {
-        role: updatedUser.role,
-        accountStatus: updatedUser.accountStatus,
-      },
-    });
+    console.error("Account-status request review failed:", error);
 
     return {
-      status: "success",
-      message: "User updated successfully.",
-      data: updatedUser,
-    };
-  } catch (error: any) {
-    console.error("adminUpdateUserService error:", error);
-
-    return {
-      status: "failed",
-      message: error?.message || "Failed to update user",
+      status: "failed" as const,
+      statusCode: 500,
+      message: "Could not review the account-status request.",
     };
   }
 };
 
+
+
+// Service to change the account status of a user by a super-admin.
+export const changeAccountStatusService = async (
+  req: Request,
+) => {
+  try {
+    const actorId = req.user?.id;
+    const targetUserId = req.params.id;
+
+    if (!actorId) {
+      throw new AccountStatusWorkflowError(
+        401,
+        "Authentication is required.",
+      );
+    }
+
+    if (
+      typeof targetUserId !== "string" ||
+      !isValidObjectId(targetUserId)
+    ) {
+      throw new AccountStatusWorkflowError(
+        400,
+        "A valid user id is required.",
+      );
+    }
+
+    const accountStatus = req.body?.accountStatus;
+    const expectedStatus = req.body?.expectedStatus;
+
+    const destinations: RequestedAccountStatus[] = [
+      AccountStatus.ACTIVE,
+      AccountStatus.SUSPENDED,
+      AccountStatus.DEACTIVATED,
+    ];
+
+    if (
+      typeof accountStatus !== "string" ||
+      !destinations.includes(
+        accountStatus as RequestedAccountStatus,
+      )
+    ) {
+      throw new AccountStatusWorkflowError(
+        400,
+        "Status must be ACTIVE, SUSPENDED, or DEACTIVATED.",
+      );
+    }
+
+    if (
+      typeof expectedStatus !== "string" ||
+      !Object.values(AccountStatus).includes(
+        expectedStatus as AccountStatus,
+      )
+    ) {
+      throw new AccountStatusWorkflowError(
+        400,
+        "The account's displayed status is required.",
+      );
+    }
+
+    const reason =
+      typeof req.body?.reason === "string"
+        ? req.body.reason.trim()
+        : "";
+
+    if (reason.length < 10 || reason.length > 2000) {
+      throw new AccountStatusWorkflowError(
+        400,
+        "A reason between 10 and 2,000 characters is required.",
+      );
+    }
+
+    const updatedUser = await User.db.transaction(
+      async (session) => {
+        const actor = await User.findById(actorId)
+          .select("_id role accountStatus")
+          .session(session);
+
+        if (
+          !actor ||
+          actor.role !== Role.SUPER_ADMIN ||
+          actor.accountStatus !== AccountStatus.ACTIVE
+        ) {
+          throw new AccountStatusWorkflowError(
+            403,
+            "An active super-admin account is required.",
+          );
+        }
+
+        const target = await User.findOne({
+          _id: targetUserId,
+          role: { $in: [Role.USER, Role.PROXY] },
+        })
+          .select("_id accountStatus")
+          .session(session);
+
+        if (!target) {
+          throw new AccountStatusWorkflowError(
+            404,
+            "An eligible user account was not found.",
+          );
+        }
+
+        if (target.accountStatus !== expectedStatus) {
+          throw new AccountStatusWorkflowError(
+            409,
+            "The account status changed. Refresh before trying again.",
+          );
+        }
+
+        if (target.accountStatus === accountStatus) {
+          throw new AccountStatusWorkflowError(
+            409,
+            "The account already has this status.",
+          );
+        }
+
+        const pendingRequest =
+          await AccountStatusRequest.findOne({
+            targetUserId: target._id,
+            status: AccountStatusRequestStatus.PENDING,
+          })
+            .select("_id")
+            .session(session);
+
+        if (pendingRequest) {
+          throw new AccountStatusWorkflowError(
+            409,
+            "This account has a pending request. Review that request first.",
+          );
+        }
+
+        const updated = await User.findOneAndUpdate(
+          {
+            _id: target._id,
+            role: { $in: [Role.USER, Role.PROXY] },
+            accountStatus: expectedStatus,
+          },
+          {
+            $set: { accountStatus },
+          },
+          {
+            new: true,
+            runValidators: true,
+            session,
+          },
+        ).select(
+          "_id email phoneNumber role accountStatus planStatus createdAt updatedAt",
+        );
+
+        if (!updated) {
+          throw new AccountStatusWorkflowError(
+            409,
+            "The account changed. Refresh before trying again.",
+          );
+        }
+
+        await AuditLog.create(
+          [
+            {
+              actorId: actor._id,
+              targetUserId: target._id,
+              action: AuditAction.USER_STATUS_CHANGED,
+              changedFields: ["accountStatus"],
+              before: {
+                accountStatus: target.accountStatus,
+              },
+              after: {
+                accountStatus: updated.accountStatus,
+              },
+              reason,
+              statusChangeRequestId: null,
+            },
+          ],
+          { session },
+        );
+
+        return updated.toObject();
+      },
+    );
+
+    return {
+      status: "success" as const,
+      statusCode: 200,
+      message: "Account status updated.",
+      data: updatedUser,
+    };
+  } catch (error: unknown) {
+    if (error instanceof AccountStatusWorkflowError) {
+      return {
+        status: "failed" as const,
+        statusCode: error.statusCode,
+        message: error.message,
+      };
+    }
+
+    console.error("Direct account-status change failed:", error);
+
+    return {
+      status: "failed" as const,
+      statusCode: 500,
+      message: "Could not change the account status.",
+    };
+  }
+};
+
+
+
+// List account status requests for an admin or super admin
+export const listAccountStatusRequestsService = async (
+  req: Request,
+) => {
+  try {
+    const actorId = req.user?.id;
+
+    if (!actorId) {
+      throw new AccountStatusWorkflowError(
+        401,
+        "Authentication is required.",
+      );
+    }
+
+    const actor = await User.findById(actorId)
+      .select("_id role accountStatus")
+      .lean();
+
+    if (
+      !actor ||
+      actor.accountStatus !== AccountStatus.ACTIVE ||
+      (actor.role !== Role.ADMIN &&
+        actor.role !== Role.SUPER_ADMIN)
+    ) {
+      throw new AccountStatusWorkflowError(
+        403,
+        "An active staff account is required.",
+      );
+    }
+
+    const page = Number(req.query.pageNo ?? 1);
+    const perPage = Number(req.query.perPage ?? 15);
+
+    if (
+      !Number.isSafeInteger(page) ||
+      page < 1 ||
+      !Number.isSafeInteger(perPage) ||
+      perPage < 1 ||
+      perPage > 100 ||
+      !Number.isSafeInteger((page - 1) * perPage)
+    ) {
+      throw new AccountStatusWorkflowError(
+        400,
+        "Use a valid page number and a page size between 1 and 100.",
+      );
+    }
+
+    const status = req.query.status;
+
+    if (
+      status !== undefined &&
+      (typeof status !== "string" ||
+        !Object.values(AccountStatusRequestStatus).includes(
+          status as AccountStatusRequestStatus,
+        ))
+    ) {
+      throw new AccountStatusWorkflowError(
+        400,
+        "Invalid request-status filter.",
+      );
+    }
+
+    const isSuperAdmin = actor.role === Role.SUPER_ADMIN;
+
+    const match: Record<string, unknown> = {};
+
+    if (!isSuperAdmin) {
+      // Aggregate pipelines require an actual ObjectId.
+      match.requestedBy = new Types.ObjectId(
+        actor._id.toString(),
+      );
+    }
+
+    if (status !== undefined) {
+      match.status = status;
+    }
+
+    const [result] = await AccountStatusRequest.aggregate([
+      { $match: match },
+
+      {
+        $lookup: {
+          from: User.collection.name,
+          let: { targetId: "$targetUserId" },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ["$_id", "$$targetId"] },
+              },
+            },
+            {
+              $project: {
+                _id: 1,
+                email: 1,
+                role: 1,
+                accountStatus: 1,
+              },
+            },
+          ],
+          as: "targetUser",
+        },
+      },
+
+      {
+        $unwind: {
+          path: "$targetUser",
+          preserveNullAndEmptyArrays: isSuperAdmin,
+        },
+      },
+
+      ...(!isSuperAdmin
+        ? [
+            {
+              $match: {
+                "targetUser.role": {
+                  $in: [Role.USER, Role.PROXY],
+                },
+              },
+            },
+          ]
+        : []),
+
+      {
+        $lookup: {
+          from: User.collection.name,
+          let: { requesterId: "$requestedBy" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $eq: ["$_id", "$$requesterId"],
+                },
+              },
+            },
+            {
+              $project: {
+                _id: 1,
+                email: 1,
+              },
+            },
+          ],
+          as: "requester",
+        },
+      },
+
+      {
+        $unwind: {
+          path: "$requester",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+
+      {
+        $project: {
+          _id: 1,
+          targetUserId: 1,
+          targetUser: 1,
+          requester: 1,
+          fromStatus: 1,
+          requestedStatus: 1,
+          internalNote: 1,
+          status: 1,
+          reviewNote: 1,
+          reviewedAt: 1,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+
+      {
+        $facet: {
+          rows: [
+            { $sort: { createdAt: -1, _id: -1 } },
+            { $skip: (page - 1) * perPage },
+            { $limit: perPage },
+          ],
+          metadata: [{ $count: "total" }],
+        },
+      },
+    ]);
+
+    const total = result?.metadata?.[0]?.total ?? 0;
+
+    return {
+      status: "success" as const,
+      statusCode: 200,
+      message: "Account-status requests retrieved.",
+      data: {
+        rows: result?.rows ?? [],
+        currentPage: page,
+        totalPages: Math.max(1, Math.ceil(total / perPage)),
+        total,
+        perPage,
+      },
+    };
+  } catch (error: unknown) {
+    if (error instanceof AccountStatusWorkflowError) {
+      return {
+        status: "failed" as const,
+        statusCode: error.statusCode,
+        message: error.message,
+      };
+    }
+
+    console.error("Account-status request listing failed:", error);
+
+    return {
+      status: "failed" as const,
+      statusCode: 500,
+      message: "Could not retrieve account-status requests.",
+    };
+  }
+};
+
+
+// Admin updates a user's details (phone number, account status, role)
+export const adminUpdateUserService = async (req: Request) => {
+  try {
+    const adminId = req.user?.id;
+    const userId = req.params.id;
+
+    if (!adminId) {
+      throw new AccountStatusWorkflowError(
+        401,
+        "Authentication is required.",
+      );
+    }
+
+    if (
+      typeof userId !== "string" ||
+      !isValidObjectId(userId)
+    ) {
+      throw new AccountStatusWorkflowError(
+        400,
+        "A valid user id is required.",
+      );
+    }
+
+    const body = req.body;
+
+    if (
+      !body ||
+      typeof body !== "object" ||
+      Array.isArray(body)
+    ) {
+      throw new AccountStatusWorkflowError(
+        400,
+        "A valid update body is required.",
+      );
+    }
+
+    // This endpoint accepts profile fields only.
+    const unsupportedFields = Object.keys(body).filter(
+      (field) => field !== "phoneNumber",
+    );
+
+    if (unsupportedFields.length > 0) {
+      throw new AccountStatusWorkflowError(
+        400,
+        "Only phoneNumber can be updated here. Use the dedicated workflow for account-status changes. Role changes are not supported by this endpoint.",
+      );
+    }
+
+    if (typeof body.phoneNumber !== "string") {
+      throw new AccountStatusWorkflowError(
+        400,
+        "Phone number must be provided as a string.",
+      );
+    }
+
+    // An empty string intentionally clears the optional phone number.
+    const phoneNumber = body.phoneNumber.trim();
+
+    if (phoneNumber.length > 50) {
+      throw new AccountStatusWorkflowError(
+        400,
+        "Phone number must not exceed 50 characters.",
+      );
+    }
+
+    const result = await User.db.transaction(
+      async (session) => {
+        const admin = await User.findById(adminId)
+          .select("_id role accountStatus")
+          .session(session);
+
+        if (
+          !admin ||
+          admin.role !== Role.SUPER_ADMIN ||
+          admin.accountStatus !== AccountStatus.ACTIVE
+        ) {
+          throw new AccountStatusWorkflowError(
+            403,
+            "An active super-admin account is required.",
+          );
+        }
+
+        // Customer profile management does not modify staff accounts.
+        const user = await User.findOne({
+          _id: userId,
+          role: { $in: [Role.USER, Role.PROXY] },
+        })
+          .select(
+            "_id email phoneNumber role accountStatus planStatus lastLoginAt mfa.enabled createdAt updatedAt",
+          )
+          .session(session);
+
+        if (!user) {
+          throw new AccountStatusWorkflowError(
+            404,
+            "An eligible user account was not found.",
+          );
+        }
+
+        if ((user.phoneNumber ?? "") === phoneNumber) {
+          return {
+            changed: false,
+            user: user.toObject(),
+          };
+        }
+
+        const before = {
+          role: user.role,
+          accountStatus: user.accountStatus,
+          phoneNumber: user.phoneNumber ?? "",
+        };
+
+        const updatedUser = await User.findOneAndUpdate(
+          {
+            _id: user._id,
+            role: { $in: [Role.USER, Role.PROXY] },
+          },
+          {
+            $set: { phoneNumber },
+          },
+          {
+            new: true,
+            runValidators: true,
+            session,
+          },
+        ).select(
+          "_id email phoneNumber role accountStatus planStatus lastLoginAt mfa.enabled createdAt updatedAt",
+        );
+
+        if (!updatedUser) {
+          throw new AccountStatusWorkflowError(
+            409,
+            "The account changed during the update. Refresh and try again.",
+          );
+        }
+
+        await AuditLog.create(
+          [
+            {
+              actorId: admin._id,
+              targetUserId: user._id,
+              action: AuditAction.USER_UPDATED,
+              changedFields: ["phoneNumber"],
+              before,
+              after: {
+                role: updatedUser.role,
+                accountStatus: updatedUser.accountStatus,
+                phoneNumber: updatedUser.phoneNumber ?? "",
+              },
+            },
+          ],
+          { session },
+        );
+
+        return {
+          changed: true,
+          user: updatedUser.toObject(),
+        };
+      },
+    );
+
+    return {
+      status: "success" as const,
+      statusCode: 200,
+      message: result.changed
+        ? "User profile updated successfully."
+        : "No changes were needed.",
+      data: result.user,
+    };
+  } catch (error: unknown) {
+    if (error instanceof AccountStatusWorkflowError) {
+      return {
+        status: "failed" as const,
+        statusCode: error.statusCode,
+        message: error.message,
+      };
+    }
+
+    console.error("Admin user-profile update failed:", error);
+
+    return {
+      status: "failed" as const,
+      statusCode: 500,
+      message: "Could not update the user profile.",
+    };
+  }
+};
 
 
 
