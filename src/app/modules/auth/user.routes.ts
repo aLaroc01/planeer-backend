@@ -3,11 +3,9 @@ import { adminDeleteUser, AdminEmail, adminLoginController, adminUpdateUser,
     codeverify, forgetPassword,  getAllOwnUserDataController,  GetAllProfile, 
     getAllProxysetController, getAllUserDataController, getCounts, getNewUsersLast10Days, 
     GetProfileData, getSystemPerformance, getUsersWhoAddedMeAsProxyController, getUsersWhoSetMyProxy, 
-    loginUser,  ProxysetController, registerUser, searchUsersController, updateUserController, 
-    UserAnalysisController, UserList, userSelfUpdate, getAccountStatus, createAccountStatusRequest, 
-    reviewAccountStatusRequest, listAccountStatusRequests, changeAccountStatus
-     } from "./user.controller";
-import { auth, isAdminOrSuperAdmin, isSuperAdmin } from './../../middleware/auth.middleware';
+    loginUser,  ProxysetController, registerUser, searchUsersController, 
+    UserAnalysisController, UserList, userSelfUpdate, getAccountStatus, adminSendPasswordReset  } from "./user.controller";
+import { auth, isAdminOrSuperAdmin } from './../../middleware/auth.middleware';
 
 
 
@@ -90,8 +88,8 @@ router.get("/pagenationlist", auth, isAdminOrSuperAdmin, UserList);
 // New Users in Last 10 Days
 router.get("/new-user-last", auth, isAdminOrSuperAdmin, getNewUsersLast10Days);
 
-// Update User by Admin
-router.put("/updateUser/:id",auth, isAdminOrSuperAdmin, updateUserController);
+// send Password Reset Email by Admin
+router.post( "/users/admin/:id/send-password-reset", auth, isAdminOrSuperAdmin, adminSendPasswordReset,);
 
 // User Analysis
 router.get("/users/analysis", auth, isAdminOrSuperAdmin, UserAnalysisController.getAnalysis);
@@ -102,22 +100,12 @@ router.get("/counts-user-report", auth, isAdminOrSuperAdmin, getCounts);
 router.delete("/deleteUser/:id", auth, isAdminOrSuperAdmin, adminDeleteUser);
 
 // User Profile Update
-router.put("/adminUpdateUser/:id", auth, isSuperAdmin, adminUpdateUser,);  
+router.put("/adminUpdateUser/:id", auth, isAdminOrSuperAdmin,adminUpdateUser)
 
 // system performance api 
 router.get("/performance",auth, isAdminOrSuperAdmin, getSystemPerformance);
 
-// Admin creates an account status request for a user
-router.post( "/users/:id/account-status-requests", auth, isAdminOrSuperAdmin, createAccountStatusRequest);
 
-// Review account status request route
-router.patch( "/account-status-requests/:requestId/review", auth, isSuperAdmin, reviewAccountStatusRequest,);
-
-// List account status requests route
-router.get( "/account-status-requests", auth, isAdminOrSuperAdmin, listAccountStatusRequests,);
-
-// Change account status route
-router.patch( "/users/:id/account-status", auth, isSuperAdmin, changeAccountStatus,);
 
 
 

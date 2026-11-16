@@ -1,8 +1,8 @@
 // // "use strict";
-
 import { User } from "./user.model";
 import bcrypt from "bcryptjs";
- import jwt from "jsonwebtoken";
+import jwt from "jsonwebtoken";
+import { randomInt } from "node:crypto";
 import { config } from '../../config/index';
 import {  Request } from "express";
 import mongoose, { Types } from 'mongoose';
@@ -24,8 +24,7 @@ import {
   AccountStatusRequestStatus,
   RequestedAccountStatus,
 } from "../account-status-request/accountStatusRequest.interface";
-// import { User } from "./user.model";
-// import { StrictMode, use } from "react";
+
 
 
 type PipelineStage = any;
@@ -418,10 +417,6 @@ export const adminDeleteUserService = async (req: Request) => {
     };
   }
 };
-
-
-
-
 
 
 
@@ -951,10 +946,11 @@ export const sendForgotPasswordEmail = async (email: string) => {
   const user = await User.findOne({ email: email.toLowerCase() });
   if (!user) throw new Error("User not found");
 
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
-  
+  const code = randomInt(100000, 1000000).toString();  
+
   user.otp = code;
   user.otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+  user.otpVerified = false;
   await user.save();
 
   const subject = "Planeer Password Reset Code";
@@ -1004,7 +1000,76 @@ export const resetPasswordService = async (email: string, password: string) => {
 
 
 
+// Admin send password reset
+export const adminSendPasswordResetService = async (
+  req: Request,
+) => {
+  const actorId = req.user?.id;
+  const userId = req.params.id;
 
+  if (!actorId) {
+    return {
+      status: "failed" as const,
+      statusCode: 401,
+      message: "Authentication is required.",
+    };
+  }
+
+  // Recheck permissions against the database.
+  const actor = await User.findById(actorId)
+    .select("_id role accountStatus")
+    .lean();
+
+  if (
+    !actor ||
+    actor.accountStatus !== AccountStatus.ACTIVE ||
+    (
+      actor.role !== Role.ADMIN &&
+      actor.role !== Role.SUPER_ADMIN
+    )
+  ) {
+    return {
+      status: "failed" as const,
+      statusCode: 403,
+      message: "An active admin or super-admin account is required.",
+    };
+  }
+
+  if (
+    typeof userId !== "string" ||
+    !isValidObjectId(userId)
+  ) {
+    return {
+      status: "failed" as const,
+      statusCode: 400,
+      message: "A valid user id is required.",
+    };
+  }
+
+  const target = await User.findOne({
+    _id: userId,
+    role: { $in: [Role.USER, Role.PROXY] },
+  })
+    .select("_id email")
+    .lean();
+
+  if (!target?.email) {
+    return {
+      status: "failed" as const,
+      statusCode: 404,
+      message: "An eligible customer account was not found.",
+    };
+  }
+
+  // Use the stored email, never an address supplied by the caller.
+  await sendForgotPasswordEmail(target.email);
+
+  return {
+    status: "success" as const,
+    statusCode: 200,
+    message: "Password reset email sent.",
+  };
+};
 
 
 

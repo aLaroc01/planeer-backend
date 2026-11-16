@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.adminUpdateUser = exports.changeAccountStatus = exports.listAccountStatusRequests = exports.getSystemPerformance = exports.adminLoginController = exports.getUsersWhoSetMyProxy = exports.getUsersWhoAddedMeAsProxyController = exports.getAllUserDataController = exports.getAllOwnUserDataController = exports.UserAnalysisController = exports.getCounts = exports.updateUserController = exports.getNewUsersLast10Days = exports.UserList = exports.reviewAccountStatusRequest = exports.forgetPassword = exports.codeverify = exports.AdminEmail = exports.createAccountStatusRequest = exports.getAllProxysetController = exports.ProxysetController = exports.searchUsersController = exports.GetAllProfile = exports.adminDeleteUser = exports.userSelfUpdate = exports.GetProfileData = exports.getAccountStatus = exports.loginUser = exports.registerUser = void 0;
+exports.adminUpdateUser = exports.getSystemPerformance = exports.adminLoginController = exports.getUsersWhoSetMyProxy = exports.getUsersWhoAddedMeAsProxyController = exports.getAllUserDataController = exports.getAllOwnUserDataController = exports.UserAnalysisController = exports.getCounts = exports.adminSendPasswordReset = exports.getNewUsersLast10Days = exports.UserList = exports.forgetPassword = exports.codeverify = exports.AdminEmail = exports.getAllProxysetController = exports.ProxysetController = exports.searchUsersController = exports.GetAllProfile = exports.adminDeleteUser = exports.userSelfUpdate = exports.GetProfileData = exports.getAccountStatus = exports.loginUser = exports.registerUser = void 0;
 const user_service_1 = require("./user.service");
 const user_interface_1 = require("./user.interface");
 const subscriptions_service_1 = require("../subscriptions-information/subscriptions.service");
@@ -236,12 +236,6 @@ exports.getAllProxysetController = getAllProxysetController;
 //     });
 //   }
 // };
-// Admin creates an account status request for a user
-const createAccountStatusRequest = async (req, res) => {
-    const result = await (0, user_service_1.createAccountStatusRequestService)(req);
-    res.status(result.statusCode).json(result);
-};
-exports.createAccountStatusRequest = createAccountStatusRequest;
 // Example: Admin Email
 const AdminEmail = async (req, res, next) => {
     try {
@@ -293,11 +287,6 @@ const forgetPassword = async (req, res, next) => {
     }
 };
 exports.forgetPassword = forgetPassword;
-const reviewAccountStatusRequest = async (req, res) => {
-    const result = await (0, user_service_1.reviewAccountStatusRequestService)(req);
-    res.status(result.statusCode).json(result);
-};
-exports.reviewAccountStatusRequest = reviewAccountStatusRequest;
 // Admin retrieves a list of users with pagination and search functionality
 const UserList = async (req, res) => {
     try {
@@ -377,15 +366,17 @@ const getNewUsersLast10Days = async (req, res) => {
     }
 };
 exports.getNewUsersLast10Days = getNewUsersLast10Days;
-// Retired legacy endpoint.
-// Account-status changes must use the dedicated status workflow.
-const updateUserController = (_req, res) => {
-    res.status(410).json({
-        status: "failed",
-        message: "This update endpoint has been retired. Use the supported user-management actions.",
-    });
+// // Admin updates a user's profile
+const adminSendPasswordReset = async (req, res, next) => {
+    try {
+        const result = await (0, user_service_1.adminSendPasswordResetService)(req);
+        res.status(result.statusCode).json(result);
+    }
+    catch (error) {
+        next(error);
+    }
 };
-exports.updateUserController = updateUserController;
+exports.adminSendPasswordReset = adminSendPasswordReset;
 // Get various counts related to users and other entities
 const getCounts = async (req, res) => {
     try {
@@ -669,27 +660,15 @@ const getSystemPerformance = async (req, res, next) => {
     }
 };
 exports.getSystemPerformance = getSystemPerformance;
-// Controller to list account status requests for a user.
-const listAccountStatusRequests = async (req, res) => {
-    const result = await (0, user_service_1.listAccountStatusRequestsService)(req);
-    res.status(result.statusCode).json(result);
-};
-exports.listAccountStatusRequests = listAccountStatusRequests;
-// Controller to change the account status of a user by a super-admin.
-const changeAccountStatus = async (req, res) => {
-    const result = await (0, user_service_1.changeAccountStatusService)(req);
-    res.status(result.statusCode).json(result);
-};
-exports.changeAccountStatus = changeAccountStatus;
 // Admin updates a user's profile
 const adminUpdateUser = async (req, res) => {
     const result = await (0, user_service_1.adminUpdateUserService)(req);
-    if (result.status === "success") {
-        (0, successLogger_1.logSuccess)(req, "Admin processed user profile update", {
+    if (result?.status === "success") {
+        (0, successLogger_1.logSuccess)(req, "Admin updated user data", {
             adminId: req.user?.id,
             updatedUserId: req.params.id,
         });
     }
-    res.status(result.statusCode).json(result);
+    res.json(result);
 };
 exports.adminUpdateUser = adminUpdateUser;

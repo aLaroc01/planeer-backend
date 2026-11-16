@@ -1,5 +1,4 @@
 "use strict";
-// // "use strict";
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -37,10 +36,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.adminLoginService = exports.getUsersWhoSetMyProxyService = exports.UserAnalysisService = exports.getCountsService = exports.adminUpdateUserService = exports.listAccountStatusRequestsService = exports.changeAccountStatusService = exports.reviewAccountStatusRequestService = exports.getNewUsersLast10DaysService = exports.getUserList = exports.updatePassword = exports.codeVerification = exports.verifyProxyOtp = exports.resetPasswordService = exports.verifyOtpService = exports.sendForgotPasswordEmail = exports.adminEmailService = exports.getUsersWhoAddedMeAsProxyService = exports.getAllUserDataService = exports.getAllOwnUserDataService = exports.getUserFullProfileService = exports.getProxysetData = exports.ProxysetService = exports.searchUsersService = exports.getallUsers = exports.createEmptyProfileForSignedInUser = exports.userSelfUpdateService = exports.adminDeleteUserService = exports.getprofileService = exports.LoginInUser = exports.existingUser = exports.createAccountStatusRequestService = void 0;
+exports.adminLoginService = exports.getUsersWhoSetMyProxyService = exports.UserAnalysisService = exports.getCountsService = exports.adminUpdateUserService = exports.listAccountStatusRequestsService = exports.changeAccountStatusService = exports.reviewAccountStatusRequestService = exports.getNewUsersLast10DaysService = exports.getUserList = exports.updatePassword = exports.codeVerification = exports.verifyProxyOtp = exports.adminSendPasswordResetService = exports.resetPasswordService = exports.verifyOtpService = exports.sendForgotPasswordEmail = exports.adminEmailService = exports.getUsersWhoAddedMeAsProxyService = exports.getAllUserDataService = exports.getAllOwnUserDataService = exports.getUserFullProfileService = exports.getProxysetData = exports.ProxysetService = exports.searchUsersService = exports.getallUsers = exports.createEmptyProfileForSignedInUser = exports.userSelfUpdateService = exports.adminDeleteUserService = exports.getprofileService = exports.LoginInUser = exports.existingUser = exports.createAccountStatusRequestService = void 0;
+// // "use strict";
 const user_model_1 = require("./user.model");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const node_crypto_1 = require("node:crypto");
 const index_1 = require("../../config/index");
 const mongoose_1 = __importStar(require("mongoose"));
 const emailHelper_1 = require("../../../helpers/emailHelper");
@@ -720,9 +721,10 @@ const sendForgotPasswordEmail = async (email) => {
     const user = await user_model_1.User.findOne({ email: email.toLowerCase() });
     if (!user)
         throw new Error("User not found");
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const code = (0, node_crypto_1.randomInt)(100000, 1000000).toString();
     user.otp = code;
     user.otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    user.otpVerified = false;
     await user.save();
     const subject = "Planeer Password Reset Code";
     const text = `Your Planeer password reset code is: ${code}`;
@@ -760,6 +762,61 @@ const resetPasswordService = async (email, password) => {
     return { message: "Password updated successfully" };
 };
 exports.resetPasswordService = resetPasswordService;
+// Admin send password reset
+const adminSendPasswordResetService = async (req) => {
+    const actorId = req.user?.id;
+    const userId = req.params.id;
+    if (!actorId) {
+        return {
+            status: "failed",
+            statusCode: 401,
+            message: "Authentication is required.",
+        };
+    }
+    // Recheck permissions against the database.
+    const actor = await user_model_1.User.findById(actorId)
+        .select("_id role accountStatus")
+        .lean();
+    if (!actor ||
+        actor.accountStatus !== user_interface_1.AccountStatus.ACTIVE ||
+        (actor.role !== user_interface_1.Role.ADMIN &&
+            actor.role !== user_interface_1.Role.SUPER_ADMIN)) {
+        return {
+            status: "failed",
+            statusCode: 403,
+            message: "An active admin or super-admin account is required.",
+        };
+    }
+    if (typeof userId !== "string" ||
+        !(0, mongoose_2.isValidObjectId)(userId)) {
+        return {
+            status: "failed",
+            statusCode: 400,
+            message: "A valid user id is required.",
+        };
+    }
+    const target = await user_model_1.User.findOne({
+        _id: userId,
+        role: { $in: [user_interface_1.Role.USER, user_interface_1.Role.PROXY] },
+    })
+        .select("_id email")
+        .lean();
+    if (!target?.email) {
+        return {
+            status: "failed",
+            statusCode: 404,
+            message: "An eligible customer account was not found.",
+        };
+    }
+    // Use the stored email, never an address supplied by the caller.
+    await (0, exports.sendForgotPasswordEmail)(target.email);
+    return {
+        status: "success",
+        statusCode: 200,
+        message: "Password reset email sent.",
+    };
+};
+exports.adminSendPasswordResetService = adminSendPasswordResetService;
 // export const sendProxyInviteService = async (req: Request) => {
 //   try {
 //     const inviterId = req.user?.id;
