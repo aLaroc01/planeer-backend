@@ -321,13 +321,24 @@ export const LoginInUser = async (email: string, password: string) => {
     },
   });
 
+  const jwtSecret = config.jwt_secret;
+
+  if (
+    typeof jwtSecret !== "string" ||
+    !jwtSecret.trim()
+  ) {
+    throw new Error("JWT signing secret is not configured");
+  }
+
   const token = jwt.sign(
     {
       userId: user._id.toString(),
       role: user.role,
     },
-    String(config.jwt_secret),
-    { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "15m" } as any
+    jwtSecret,
+    {
+      expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "15m",
+    } as jwt.SignOptions
   );
 
   return {
@@ -926,7 +937,7 @@ export const adminEmailService = async (req:Request) => {
     let EmailTo=email ;
     let EmailText = `Your code is= ${code}`;
     let EmailSubject = `Planeer Admin email verification Code `;
-    await SendEmail(EmailTo, EmailText, EmailSubject)
+    await SendEmail(EmailTo, EmailSubject, EmailText);
     await User.updateOne(
       { email: email },
       { otp: code },
@@ -942,23 +953,373 @@ export const adminEmailService = async (req:Request) => {
 
 
 // 1. SEND FORGOT PASSWORD EMAIL (sends OTP)
+// Ensure this import exists at the top of the service file:
+// import { randomInt } from "node:crypto";
+
 export const sendForgotPasswordEmail = async (email: string) => {
-  const user = await User.findOne({ email: email.toLowerCase() });
-  if (!user) throw new Error("User not found");
+  const normalizedEmail = email.trim().toLowerCase();
 
-  const code = randomInt(100000, 1000000).toString();  
+  let stage = "find-user";
 
-  user.otp = code;
-  user.otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-  user.otpVerified = false;
-  await user.save();
+  try {
+    const user = await User.findOne({
+      email: normalizedEmail,
+    });
 
-  const subject = "Planeer Password Reset Code";
-  const text = `Your Planeer password reset code is: ${code}`;
-  
-  await SendEmail(email, subject, text);
-  
-  return { message: "6 digit code sent successfully" };
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    stage = "save-reset-code";
+
+    const code = randomInt(100000, 1000000).toString();
+    const expiresInMinutes = 10;
+
+    user.otp = code;
+    user.otpExpiresAt = new Date(
+      Date.now() + expiresInMinutes * 60 * 1000
+    );
+    user.otpVerified = false;
+
+    await user.save();
+
+    stage = "build-email";
+
+    const subject = "Your Planeer password reset code";
+
+    const text = [
+      "Reset your Planeer password",
+      "",
+      "We received a request to reset your Planeer password.",
+      "",
+      `Your verification code is: ${code}`,
+      "",
+      `This code expires in ${expiresInMinutes} minutes.`,
+      "Enter it on the verification page to continue.",
+      "",
+      "If you didn't request this, you can ignore this email.",
+      "Never share this code with anyone.",
+      "",
+      "The Planeer Team",
+    ].join("\n");
+
+    const escapeHtml = (value: string): string =>
+      value.replace(/[&<>"']/g, (character) => {
+        const entities: Record<string, string> = {
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        };
+
+        return entities[character] ?? character;
+      });
+
+    const logoUrl = process.env.EMAIL_LOGO_URL?.trim();
+
+    const brand = logoUrl
+      ? `
+        <img
+          src="${escapeHtml(logoUrl)}"
+          alt="Planeer"
+          width="148"
+          style="
+            display: block;
+            width: 148px;
+            max-width: 100%;
+            height: auto;
+            margin: 0 auto;
+            border: 0;
+          "
+        />
+      `
+      : `
+        <span
+          style="
+            font-size: 28px;
+            line-height: 36px;
+            font-weight: 700;
+            letter-spacing: -1px;
+            color: #111827;
+          "
+        >
+          Planeer
+        </span>
+      `;
+
+    const html = `
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <title>Reset your Planeer password</title>
+  </head>
+
+  <body
+    style="
+      margin: 0;
+      padding: 0;
+      background-color: #f3f5f9;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #111827;
+      -webkit-text-size-adjust: 100%;
+    "
+  >
+    <div
+      style="
+        display: none;
+        font-size: 1px;
+        line-height: 1px;
+        max-height: 0;
+        max-width: 0;
+        opacity: 0;
+        overflow: hidden;
+        mso-hide: all;
+      "
+    >
+      Your Planeer password reset code expires in
+      ${expiresInMinutes} minutes.
+    </div>
+
+    <table
+      role="presentation"
+      width="100%"
+      cellpadding="0"
+      cellspacing="0"
+      border="0"
+      style="background-color: #f3f5f9;"
+    >
+      <tr>
+        <td align="center" style="padding: 40px 16px;">
+          <table
+            role="presentation"
+            width="100%"
+            cellpadding="0"
+            cellspacing="0"
+            border="0"
+            style="width: 100%; max-width: 560px;"
+          >
+            <tr>
+              <td align="center" style="padding: 0 0 28px;">
+                ${brand}
+              </td>
+            </tr>
+
+            <tr>
+              <td
+                style="
+                  padding: 36px 24px;
+                  background-color: #ffffff;
+                  border: 1px solid #e5e7eb;
+                  border-top: 4px solid #4f46e5;
+                  border-radius: 16px;
+                "
+              >
+                <h1
+                  style="
+                    margin: 0 0 16px;
+                    font-size: 26px;
+                    line-height: 34px;
+                    letter-spacing: -0.5px;
+                    color: #111827;
+                    text-align: center;
+                  "
+                >
+                  Reset your password
+                </h1>
+
+                <p
+                  style="
+                    margin: 0;
+                    font-size: 15px;
+                    line-height: 24px;
+                    color: #6b7280;
+                    text-align: center;
+                  "
+                >
+                  We received a request to reset the password
+                  for your Planeer account. Enter the verification
+                  code below to continue.
+                </p>
+
+                <table
+                  role="presentation"
+                  width="100%"
+                  cellpadding="0"
+                  cellspacing="0"
+                  border="0"
+                >
+                  <tr>
+                    <td style="padding: 28px 0 20px;">
+                      <table
+                        role="presentation"
+                        width="100%"
+                        cellpadding="0"
+                        cellspacing="0"
+                        border="0"
+                        style="
+                          background-color: #eef2ff;
+                          border: 1px solid #e0e7ff;
+                          border-radius: 12px;
+                        "
+                      >
+                        <tr>
+                          <td
+                            align="center"
+                            style="padding: 22px 12px;"
+                          >
+                            <p
+                              style="
+                                margin: 0 0 10px;
+                                font-size: 11px;
+                                line-height: 16px;
+                                font-weight: 700;
+                                letter-spacing: 1.5px;
+                                color: #6366f1;
+                              "
+                            >
+                              YOUR VERIFICATION CODE
+                            </p>
+
+                            <p
+                              style="
+                                margin: 0;
+                                font-family: 'Courier New', Courier, monospace;
+                                font-size: 36px;
+                                line-height: 44px;
+                                font-weight: 700;
+                                letter-spacing: 6px;
+                                color: #312e81;
+                              "
+                            >${code}</p>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+
+                <p
+                  style="
+                    margin: 0;
+                    font-size: 14px;
+                    line-height: 22px;
+                    color: #6b7280;
+                    text-align: center;
+                  "
+                >
+                  This code expires in
+                  <strong style="color: #374151;">
+                    ${expiresInMinutes} minutes
+                  </strong>.
+                  <br />
+                  Never share this code with anyone.
+                </p>
+
+                <table
+                  role="presentation"
+                  width="100%"
+                  cellpadding="0"
+                  cellspacing="0"
+                  border="0"
+                >
+                  <tr>
+                    <td
+                      style="
+                        height: 28px;
+                        border-bottom: 1px solid #e5e7eb;
+                      "
+                    >
+                      &nbsp;
+                    </td>
+                  </tr>
+                </table>
+
+                <p
+                  style="
+                    margin: 22px 0 0;
+                    font-size: 13px;
+                    line-height: 21px;
+                    color: #6b7280;
+                  "
+                >
+                  Didn't request a password reset?
+                  You can ignore this email. Your password
+                  won't change unless the reset process
+                  is completed.
+                </p>
+
+                <p
+                  style="
+                    margin: 22px 0 0;
+                    font-size: 14px;
+                    line-height: 22px;
+                    color: #374151;
+                  "
+                >
+                  Thanks,<br />
+                  <strong>The Planeer Team</strong>
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td
+                align="center"
+                style="
+                  padding: 24px 12px 0;
+                  font-size: 12px;
+                  line-height: 20px;
+                  color: #9ca3af;
+                "
+              >
+                &copy; ${new Date().getFullYear()} Planeer.
+                All rights reserved.
+                <br />
+                This is an automated account-security message.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+    `;
+
+    stage = "send-email";
+
+    await SendEmail(normalizedEmail, subject, text, html);
+
+    console.info("[Password reset email] completed");
+
+    return {
+      message: "6 digit code sent successfully",
+    };
+  } catch (error: unknown) {
+    const err = error as {
+      name?: string;
+      message?: string;
+      code?: string | number;
+      status?: number;
+      statusCode?: number;
+    } | null;
+
+    console.error("[Password reset email] failed", {
+      stage,
+      name: err?.name,
+      message: err?.message,
+      code: err?.code,
+      statusCode: err?.statusCode ?? err?.status,
+    });
+
+    throw error;
+  }
 };
 
 
@@ -1211,18 +1572,48 @@ export const verifyProxyOtp = async (email: string, otp: string, password: strin
 
 
 
-export const codeVerification = async (email: string, code: string) => {
+export const codeVerification = async (
+  email: string,
+  code: string
+) => {
+  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedCode = code.trim();
 
-  const user = await User.findOne({ email:email, otp: code });
+  const user = await User.findOneAndUpdate(
+    {
+      email: normalizedEmail,
+      otp: normalizedCode,
+      otpExpiresAt: { $gt: new Date() },
+      otpVerified: false,
+    },
+    {
+      $set: {
+        otpVerified: true,
+      },
+    },
+    {
+      new: true,
+      runValidators: true,
+    }
+  );
+
   if (!user) {
-    throw new Error("User not found");
+    const error = Object.assign(
+      new Error(
+        "Invalid, expired, or already verified code. Please request a new code."
+      ),
+      {
+        statusCode: 400,
+        status: "failed",
+      }
+    );
+
+    throw error;
   }
 
-  if (user.otp !== code) {
-    throw new Error("Invalid code");
-  }
-
-  return { message: "Code verified successfully" };
+  return {
+    message: "Code verified successfully",
+  };
 };
 
 
@@ -2432,7 +2823,7 @@ export class UserAnalysisService {
 
 
 
-
+// 
 export const getUsersWhoSetMyProxyService = async (
   myUserId: string
 ): Promise<ProxyUserResponse> => {
@@ -2468,10 +2859,6 @@ export const getUsersWhoSetMyProxyService = async (
 
 
 //end admin login 
-
-
-
-
 export const adminLoginService = async (
   email: string,
   password: string

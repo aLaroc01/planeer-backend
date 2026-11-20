@@ -55,4 +55,4 @@ router.post("/reset-password", async (req: Request, res: Response) => {
   }
 });
 
-export default router;
+export const authRoutes = router;

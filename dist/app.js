@@ -218,6 +218,7 @@ app.use("/api/v1/audit-logs", auditLog_routes_1.AuditLogRoutes);
 app.use("/api/v1", support_routes_1.SupportRoutes);
 app.use("/api/v1", checklist_routes_1.ChecklistRoutes);
 app.use("/api/v1", support_request_routes_1.SupportRequestRoutes);
+// app.use("/api/v1/", authRoutes);
 /*
 |--------------------------------------------------------------------------
 | Basic routes

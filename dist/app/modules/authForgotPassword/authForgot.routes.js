@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.authRoutes = void 0;
 const express_1 = require("express");
 const authForgot_service_1 = require("../authForgotPassword/authForgot.service");
 const router = (0, express_1.Router)();
@@ -51,4 +52,4 @@ router.post("/reset-password", async (req, res) => {
         });
     }
 });
-exports.default = router;
+exports.authRoutes = router;

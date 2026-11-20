@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.adminUpdateUser = exports.getSystemPerformance = exports.adminLoginController = exports.getUsersWhoSetMyProxy = exports.getUsersWhoAddedMeAsProxyController = exports.getAllUserDataController = exports.getAllOwnUserDataController = exports.UserAnalysisController = exports.getCounts = exports.adminSendPasswordReset = exports.getNewUsersLast10Days = exports.UserList = exports.forgetPassword = exports.codeverify = exports.AdminEmail = exports.getAllProxysetController = exports.ProxysetController = exports.searchUsersController = exports.GetAllProfile = exports.adminDeleteUser = exports.userSelfUpdate = exports.GetProfileData = exports.getAccountStatus = exports.loginUser = exports.registerUser = void 0;
+exports.adminUpdateUser = exports.getSystemPerformance = exports.adminLoginController = exports.getUsersWhoSetMyProxy = exports.getUsersWhoAddedMeAsProxyController = exports.getAllUserDataController = exports.getAllOwnUserDataController = exports.UserAnalysisController = exports.getCounts = exports.adminSendPasswordReset = exports.getNewUsersLast10Days = exports.UserList = exports.forgetPassword = exports.codeverify = exports.AdminEmail = exports.getAllProxysetController = exports.ProxysetController = exports.searchUsersController = exports.GetAllProfile = exports.adminDeleteUser = exports.userSelfUpdate = exports.GetProfileData = exports.getAccountStatus = exports.forgotPasswordController = exports.loginUser = exports.registerUser = void 0;
 const user_service_1 = require("./user.service");
 const user_interface_1 = require("./user.interface");
 const subscriptions_service_1 = require("../subscriptions-information/subscriptions.service");
@@ -54,6 +54,29 @@ const loginUser = async (req, res, next) => {
     }
 };
 exports.loginUser = loginUser;
+// send forgot password controller
+const forgotPasswordController = async (req, res, next) => {
+    const email = req.body?.email;
+    if (typeof email !== "string" || !email.trim()) {
+        return res.status(400).json({
+            success: false,
+            message: "Email is required",
+        });
+    }
+    const normalizedEmail = email.trim().toLowerCase();
+    try {
+        const result = await (0, user_service_1.sendForgotPasswordEmail)(normalizedEmail);
+        return res.status(200).json({
+            success: true,
+            message: result.message,
+        });
+    }
+    catch (error) {
+        // Pass service/database/email errors to the existing error handler.
+        return next(error);
+    }
+};
+exports.forgotPasswordController = forgotPasswordController;
 // Get the account status of the currently logged-in user
 const getAccountStatus = async (req, res, next) => {
     try {
@@ -251,13 +274,40 @@ exports.AdminEmail = AdminEmail;
 // User verifies an OTP code
 const codeverify = async (req, res, next) => {
     try {
-        const { email, otp } = req.body;
-        if (!email || !otp) {
-            return res.status(400).json({ message: "Email and otp are required" });
+        const { email, otp } = req.body ?? {};
+        console.log("Received OTP verification request with email:", email, "otp:", otp);
+        if (typeof email !== "string" || !email.trim()) {
+            return res.status(400).json({
+                status: "failed",
+                success: false,
+                message: "Email is required",
+            });
         }
-        const result = await (0, user_service_1.codeVerification)(email, otp);
-        (0, successLogger_1.logSuccess)(req, "OTP code verified", { email });
-        return res.json({ status: "success", message: result.message });
+        if (typeof otp !== "string" && typeof otp !== "number") {
+            return res.status(400).json({
+                status: "failed",
+                success: false,
+                message: "A 6-digit verification code is required",
+            });
+        }
+        const normalizedEmail = email.trim().toLowerCase();
+        const normalizedOtp = String(otp).trim();
+        if (!/^\d{6}$/.test(normalizedOtp)) {
+            return res.status(400).json({
+                status: "failed",
+                success: false,
+                message: "Please enter a valid 6-digit verification code",
+            });
+        }
+        const result = await (0, user_service_1.codeVerification)(normalizedEmail, normalizedOtp);
+        (0, successLogger_1.logSuccess)(req, "OTP code verified", {
+            email: normalizedEmail,
+        });
+        return res.status(200).json({
+            status: "success",
+            success: true,
+            message: result.message,
+        });
     }
     catch (error) {
         next(error);

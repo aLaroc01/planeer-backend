@@ -9,38 +9,59 @@ const config_1 = require("../config");
 const user_model_1 = require("../modules/auth/user.model");
 const user_interface_1 = require("../modules/auth/user.interface");
 const auth = async (req, res, next) => {
+    let stage = "read-authorization";
     try {
         const authorization = req.headers.authorization;
         const token = authorization?.split(" ")[1];
         if (!token) {
-            return res.status(401).json({ message: "Unauthorized access" });
+            return res.status(401).json({
+                message: "Unauthorized access",
+            });
         }
+        stage = "verify-token";
         const decoded = jsonwebtoken_1.default.verify(token, config_1.config.jwt_secret);
+        stage = "find-user";
         const user = await user_model_1.User.findById(decoded.userId);
         if (!user) {
-            return res.status(404).json({ message: "User not found" });
+            return res.status(404).json({
+                message: "User not found",
+            });
         }
+        stage = "attach-user";
         req.user = {
             _id: user._id,
             id: user._id,
             role: user.role,
         };
+        stage = "check-account-status";
         if (user.accountStatus === user_interface_1.AccountStatus.SUSPENDED ||
             user.accountStatus === user_interface_1.AccountStatus.DEACTIVATED) {
             return res.status(403).json({
                 message: "This account is not currently permitted to access the application.",
             });
         }
+        stage = "next";
         next();
     }
     catch (error) {
-        return res.status(403).json({ message: "Invalid token" });
+        const err = error;
+        // Do not log the token, authorization header, or JWT secret.
+        console.error("[Auth] Authentication failed", {
+            stage,
+            name: err?.name,
+            message: err?.message,
+        });
+        return res.status(403).json({
+            message: "Invalid token",
+        });
     }
 };
 exports.auth = auth;
 const isAdmin = (req, res, next) => {
     if (req.user?.role !== "ADMIN") {
-        return res.status(403).json({ message: "Access denied. Admins only." });
+        return res.status(403).json({
+            message: "Access denied. Admins only.",
+        });
     }
     next();
 };
@@ -68,7 +89,9 @@ const isAdminOrSuperAdmin = (req, res, next) => {
 exports.isAdminOrSuperAdmin = isAdminOrSuperAdmin;
 const isCorporate = (req, res, next) => {
     if (req.user?.role !== "corporate") {
-        return res.status(403).json({ message: "Access denied. Corporate users only." });
+        return res.status(403).json({
+            message: "Access denied. Corporate users only.",
+        });
     }
     next();
 };

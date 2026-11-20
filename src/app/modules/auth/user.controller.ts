@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import { adminDeleteUserService, adminEmailService, adminLoginService, adminUpdateUserService, codeVerification,  existingUser,  
    getAllOwnUserDataService, getAllUserDataService,  getallUsers, getCountsService, getNewUsersLast10DaysService, getprofileService, 
    getProxysetData, getUsersWhoAddedMeAsProxyService, getUsersWhoSetMyProxyService,LoginInUser,  ProxysetService, searchUsersService,  
-   updatePassword, UserAnalysisService, userSelfUpdateService, adminSendPasswordResetService } from "./user.service";
+   updatePassword, UserAnalysisService, userSelfUpdateService, adminSendPasswordResetService, sendForgotPasswordEmail } from "./user.service";
 import { PlanStatus, Role } from "./user.interface";
 import { checkActiveSubscription } from "../subscriptions-information/subscriptions.service";
 import { User } from "./user.model";
@@ -47,9 +47,6 @@ export const registerUser = async (
 };
 
 
-
-
-
 // User login controller
 export const loginUser = async (req:Request, res:Response, next:NextFunction) => {
     try{
@@ -75,6 +72,38 @@ export const loginUser = async (req:Request, res:Response, next:NextFunction) =>
         next(error);
     }
 }   
+
+
+
+// send forgot password controller
+export const forgotPasswordController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const email = req.body?.email;
+
+  if (typeof email !== "string" || !email.trim()) {
+    return res.status(400).json({
+      success: false,
+      message: "Email is required",
+    });
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+
+  try {
+    const result = await sendForgotPasswordEmail(normalizedEmail);
+
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error) {
+    // Pass service/database/email errors to the existing error handler.
+    return next(error);
+  }
+};
 
 
 // Get the account status of the currently logged-in user
@@ -333,25 +362,6 @@ export const getAllProxysetController = async (req: Request, res: Response) => {
 // };
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // Example: Admin Email
 export const AdminEmail = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -370,18 +380,56 @@ export const AdminEmail = async (req: Request, res: Response, next: NextFunction
 
 
 // User verifies an OTP code
-export const codeverify = async (req: Request, res: Response, next: NextFunction) => {
+export const codeverify = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
-    const { email, otp } = req.body;
+    const { email, otp } = req.body ?? {};
+    console.log("Received OTP verification request with email:", email, "otp:", otp);
 
-    if (!email || !otp) {
-      return res.status(400).json({ message: "Email and otp are required" });
+    if (typeof email !== "string" || !email.trim()) {
+      return res.status(400).json({
+        status: "failed",
+        success: false,
+        message: "Email is required",
+      });
     }
 
-    const result = await codeVerification(email, otp);
-    logSuccess(req, "OTP code verified", { email });
+    if (typeof otp !== "string" && typeof otp !== "number") {
+      return res.status(400).json({
+        status: "failed",
+        success: false,
+        message: "A 6-digit verification code is required",
+      });
+    }
 
-    return res.json({ status: "success", message: result.message });
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedOtp = String(otp).trim();
+
+    if (!/^\d{6}$/.test(normalizedOtp)) {
+      return res.status(400).json({
+        status: "failed",
+        success: false,
+        message: "Please enter a valid 6-digit verification code",
+      });
+    }
+
+    const result = await codeVerification(
+      normalizedEmail,
+      normalizedOtp
+    );
+
+    logSuccess(req, "OTP code verified", {
+      email: normalizedEmail,
+    });
+
+    return res.status(200).json({
+      status: "success",
+      success: true,
+      message: result.message,
+    });
   } catch (error) {
     next(error);
   }

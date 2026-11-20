@@ -4,7 +4,7 @@ import { adminDeleteUser, AdminEmail, adminLoginController, adminUpdateUser,
     getAllProxysetController, getAllUserDataController, getCounts, getNewUsersLast10Days, 
     GetProfileData, getSystemPerformance, getUsersWhoAddedMeAsProxyController, getUsersWhoSetMyProxy, 
     loginUser,  ProxysetController, registerUser, searchUsersController, 
-    UserAnalysisController, UserList, userSelfUpdate, getAccountStatus, adminSendPasswordReset  } from "./user.controller";
+    UserAnalysisController, UserList, userSelfUpdate, getAccountStatus, adminSendPasswordReset, forgotPasswordController  } from "./user.controller";
 import { auth, isAdminOrSuperAdmin } from './../../middleware/auth.middleware';
 
 
@@ -34,6 +34,15 @@ router.get("/search", auth, searchUsersController);
 // get account status
 router.get("/account-status", auth, getAccountStatus);
 
+// forgot password route
+// router.post("/auth/forgot-password", auth, );
+
+// codeverify  routes
+router.post("/codeverify",codeverify);
+
+// codeverify  routes
+router.post("/auth/forgot-password", forgotPasswordController);
+
 // router.get("/alldata-percentage/:userId",auth, alldatapercentage);
 
 
@@ -44,8 +53,9 @@ router.get("/account-status", auth, getAccountStatus);
 
 
 // proxyset user
-router.post("/proxyset/:proxysetId",auth,ProxysetController)
-router.get("/getAllProxyset/:id",auth,getAllProxysetController)
+router.post("/proxyset/:proxysetId",auth,ProxysetController);
+
+router.get("/getAllProxyset/:id",auth,getAllProxysetController);
 
 // GET all user data (HomeAuto + Medical + Financial)
 router.get("/proxyset-call-api/:userId", auth, getAllUserDataController);
@@ -73,12 +83,6 @@ router.post("/adminlogin",adminLoginController)
 
 // admin  routes
 router.post("/AdminEmail",AdminEmail)
-
-// codeverify  routes
-router.post("/codeverify",codeverify)
-
-// codeverify  routes
-router.post("/forgetPassword",forgetPassword)
 
 // User List with Pagination
 // router.get("/pagenationlist/:pageNo/:perPage/:searchKeyword",auth,isAdmin, UserList);

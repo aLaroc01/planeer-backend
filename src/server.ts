@@ -10,7 +10,7 @@ import { startArchiveExpiryJob } from "./helpers/archiveExpiryJob";
    
    app.listen(config.port, () => {
   console.log(`Server is running on port ${config.port}`); });
-  console.log(">>> DEPLOY CHECK: backend build v2");
+  console.log(">>> DEPLOY CHECK: backend build v1");
 
 }
 

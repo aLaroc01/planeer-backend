@@ -7,23 +7,29 @@ exports.resetPasswordService = exports.verifyOtpService = exports.forgotPassword
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const user_model_1 = require("../auth/user.model");
 const emailHelper_1 = require("../../../helpers/emailHelper");
-const forgotPasswordService = async ({ email }) => {
-    if (!email) {
+const node_crypto_1 = require("node:crypto");
+const forgotPasswordService = async ({ email, }) => {
+    if (typeof email !== "string" || !email.trim()) {
         throw new Error("Email is required");
     }
-    const user = await user_model_1.User.findOne({ email: email.toLowerCase() });
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await user_model_1.User.findOne({
+        email: normalizedEmail,
+    });
     if (!user) {
         throw new Error("User not found");
     }
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const code = (0, node_crypto_1.randomInt)(100000, 1000000).toString();
     user.otp = code;
-    // user.otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    // user.otpVerified = false;
+    user.otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    user.otpVerified = false;
     await user.save();
     const subject = "Planeer Password Reset Code";
     const text = `Your Planeer password reset code is: ${code}`;
     await (0, emailHelper_1.SendEmail)(user.email, subject, text);
-    return { message: "6 digit code sent successfully" };
+    return {
+        message: "6 digit code sent successfully",
+    };
 };
 exports.forgotPasswordService = forgotPasswordService;
 const verifyOtpService = async ({ email, code }) => {

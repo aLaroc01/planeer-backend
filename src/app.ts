@@ -24,6 +24,7 @@ import { AuditLogRoutes } from "./app/modules/audit-log/auditLog.routes";
 import { SupportRoutes } from "./app/modules/support/support.routes";
 import { ChecklistRoutes } from "./app/modules/checklist/checklist.routes";
 import { SupportRequestRoutes } from "./app/modules/support-request/support-request.routes";
+import { authRoutes } from "./app/modules/authForgotPassword/authForgot.routes";
 
 // Controllers / middleware / helpers
 import { SubscriptionController } from "./app/modules/subscriptions-information/subscriptions.controller";
@@ -278,6 +279,7 @@ app.use("/api/v1/audit-logs", AuditLogRoutes);
 app.use("/api/v1", SupportRoutes);
 app.use("/api/v1", ChecklistRoutes);
 app.use("/api/v1", SupportRequestRoutes);
+// app.use("/api/v1/", authRoutes);
 
 /*
 |--------------------------------------------------------------------------

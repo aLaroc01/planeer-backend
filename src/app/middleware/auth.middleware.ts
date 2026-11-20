@@ -1,93 +1,148 @@
-
 import { NextFunction, Request, Response } from "express";
-import  jwt  from 'jsonwebtoken';
+import jwt from "jsonwebtoken";
 import { config } from "../config";
 import { User } from "../modules/auth/user.model";
 import { AccountStatus } from "../modules/auth/user.interface";
 
-
 interface AuthenticatedRequest extends Request {
-  user?:any
+  user?: any;
 }
 
+export const auth = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  let stage = "read-authorization";
 
-
-export const auth = async(req:AuthenticatedRequest, res:Response, next:NextFunction) => {
   try {
-      const authorization = req.headers.authorization;
-      const token = authorization?.split(" ")[1];
+    const authorization = req.headers.authorization;
+    const token = authorization?.split(" ")[1];
 
-  if (!token) {
-    return res.status(401).json({ message: "Unauthorized access" });
-  }
+    if (!token) {
+      return res.status(401).json({
+        message: "Unauthorized access",
+      });
+    }
 
+    stage = "verify-token";
 
+    const decoded = jwt.verify(
+      token,
+      config.jwt_secret as string
+    ) as {
+      userId: string;
+      role: string;
+    };
 
-    const decoded = jwt.verify(token, config.jwt_secret as string)  as { userId: string, role: string };
-    const user =await User.findById(decoded.userId)
+    stage = "find-user";
+
+    const user = await User.findById(decoded.userId);
+
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({
+        message: "User not found",
+      });
     }
+
+    stage = "attach-user";
+
     req.user = {
-        _id: user._id,
-        id: user._id,
-        role: user.role,
-    }
+      _id: user._id,
+      id: user._id,
+      role: user.role,
+    };
+
+    stage = "check-account-status";
+
     if (
       user.accountStatus === AccountStatus.SUSPENDED ||
       user.accountStatus === AccountStatus.DEACTIVATED
     ) {
       return res.status(403).json({
-        message: "This account is not currently permitted to access the application.",
+        message:
+          "This account is not currently permitted to access the application.",
       });
     }
+
+    stage = "next";
+
     next();
-  } catch (error) {
-    return res.status(403).json({ message: "Invalid token" });
+  } catch (error: unknown) {
+    const err = error as {
+      name?: string;
+      message?: string;
+    } | null;
+
+    // Do not log the token, authorization header, or JWT secret.
+    console.error("[Auth] Authentication failed", {
+      stage,
+      name: err?.name,
+      message: err?.message,
+    });
+
+    return res.status(403).json({
+      message: "Invalid token",
+    });
   }
-}
-
-
-
-export const isAdmin = (req:AuthenticatedRequest, res:Response, next:NextFunction) => {
-  if (req.user?.role !== "ADMIN") {
-   return res.status(403).json({ message: "Access denied. Admins only." });
-  }
-    next();
 };
 
+export const isAdmin = (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  if (req.user?.role !== "ADMIN") {
+    return res.status(403).json({
+      message: "Access denied. Admins only.",
+    });
+  }
 
-export const isSuperAdmin = ( req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  next();
+};
+
+export const isSuperAdmin = (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
   if (req.user?.role !== "SUPER_ADMIN") {
     return res.status(403).json({
       success: false,
       message: "Super admin access is required",
     });
   }
+
   next();
 };
 
 export const isAdminOrSuperAdmin = (
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ) => {
-    const role = req.user?.role;
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  const role = req.user?.role;
 
-    if (role !== "ADMIN" && role !== "SUPER_ADMIN") {
-      return res.status(403).json({
-        success: false,
-        message: "Admin access is required",
-      });
-    }
+  if (role !== "ADMIN" && role !== "SUPER_ADMIN") {
+    return res.status(403).json({
+      success: false,
+      message: "Admin access is required",
+    });
+  }
+
   next();
 };
 
-
-
-export const isCorporate = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+export const isCorporate = (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
   if (req.user?.role !== "corporate") {
-    return res.status(403).json({ message: "Access denied. Corporate users only." });
+    return res.status(403).json({
+      message: "Access denied. Corporate users only.",
+    });
   }
+
   next();
 };

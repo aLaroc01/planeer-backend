@@ -22,6 +22,12 @@ router.get("/GetAllProfile", auth_middleware_1.auth, user_controller_1.GetAllPro
 router.get("/search", auth_middleware_1.auth, user_controller_1.searchUsersController);
 // get account status
 router.get("/account-status", auth_middleware_1.auth, user_controller_1.getAccountStatus);
+// forgot password route
+// router.post("/auth/forgot-password", auth, );
+// codeverify  routes
+router.post("/codeverify", user_controller_1.codeverify);
+// codeverify  routes
+router.post("/auth/forgot-password", user_controller_1.forgotPasswordController);
 // router.get("/alldata-percentage/:userId",auth, alldatapercentage);
 // proxyset user
 router.post("/proxyset/:proxysetId", auth_middleware_1.auth, user_controller_1.ProxysetController);
@@ -40,10 +46,6 @@ router.post("/adminregister", user_controller_1.registerUser);
 router.post("/adminlogin", user_controller_1.adminLoginController);
 // admin  routes
 router.post("/AdminEmail", user_controller_1.AdminEmail);
-// codeverify  routes
-router.post("/codeverify", user_controller_1.codeverify);
-// codeverify  routes
-router.post("/forgetPassword", user_controller_1.forgetPassword);
 // User List with Pagination
 // router.get("/pagenationlist/:pageNo/:perPage/:searchKeyword",auth,isAdmin, UserList);
 router.get("/pagenationlist", auth_middleware_1.auth, auth_middleware_1.isAdminOrSuperAdmin, user_controller_1.UserList);
