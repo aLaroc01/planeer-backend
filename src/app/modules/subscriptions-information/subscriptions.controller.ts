@@ -14,6 +14,7 @@ import {
 import AppError from "../../../errors/AppError";
 import { StatusCodes } from "http-status-codes";
 import Stripe from "stripe";
+import { Subscription } from "./subscriptions.model";
 // import stripe from '../../config/stripe';
 
 
@@ -29,13 +30,93 @@ const subscriptions = catchAsync(async (req, res) => {
 
 
 const subscriptionDetails = catchAsync(async (req, res) => {
-     sendResponse(res, {
-          statusCode: StatusCodes.NOT_IMPLEMENTED,
-          success: false,
-          message: 'Subscription details retrieval is not implemented',
-          data: null,
-     });
+  const authenticatedId = req.user?.id;
+
+  const userId = Array.isArray(authenticatedId)
+    ? authenticatedId[0]
+    : authenticatedId;
+
+  if (!userId) {
+    throw new AppError(
+      StatusCodes.UNAUTHORIZED,
+      "Authentication is required.",
+    );
+  }
+
+  const subscriptions = await Subscription.find({ userId })
+    .select(
+      [
+        "status",
+        "stripeStatus",
+        "currentPeriodEnd",
+        "trialEnd",
+        "cancelAtPeriodEnd",
+        "paymentCollectionPaused",
+      ].join(" "),
+    )
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const now = Date.now();
+
+  const isFutureDate = (value: unknown): boolean => {
+    if (!value) return false;
+
+    const timestamp = new Date(
+      value as string | number | Date,
+    ).getTime();
+
+    return Number.isFinite(timestamp) && timestamp > now;
+  };
+
+  const hasActiveSubscription = subscriptions.some(
+    (subscription: {
+      status?: string;
+      stripeStatus?: string | null;
+      currentPeriodEnd?: unknown;
+      trialEnd?: unknown;
+    }) => {
+      if (subscription.status !== "active") {
+        return false;
+      }
+
+      if (subscription.stripeStatus === "trialing") {
+        return isFutureDate(subscription.trialEnd);
+      }
+
+      if (subscription.stripeStatus === "active") {
+        return isFutureDate(subscription.currentPeriodEnd);
+      }
+
+      return false;
+    },
+  );
+
+  // Conservative checkout policy:
+  // Only records confirmed terminal by Stripe allow a new purchase.
+  // Missing/unknown Stripe status requires account review.
+  const hasUnresolvedSubscription = subscriptions.some(
+    (subscription: { stripeStatus?: string | null }) =>
+      subscription.stripeStatus !== "canceled" &&
+      subscription.stripeStatus !== "incomplete_expired",
+  );
+
+  const canStartCheckout =
+    !hasActiveSubscription && !hasUnresolvedSubscription;
+
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: "Subscription details retrieved successfully.",
+    data: {
+      hasActiveSubscription,
+      canStartCheckout,
+      requiresAccountReview:
+        !hasActiveSubscription && !canStartCheckout,
+    },
+  });
 });
+
 
 const cancelSubscription = catchAsync(async (req, res) => {
      sendResponse(res, {
@@ -144,8 +225,6 @@ export const checkoutSuccessController = catchAsync(async (req, res ) => {
       message: "Subscription verified successfully.",
       data: subscription,
     });
-
-
 });
 
 

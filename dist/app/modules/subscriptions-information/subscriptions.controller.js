@@ -10,6 +10,7 @@ const subscriptions_service_1 = require("./subscriptions.service");
 const AppError_1 = __importDefault(require("../../../errors/AppError"));
 const http_status_codes_1 = require("http-status-codes");
 const stripe_1 = __importDefault(require("stripe"));
+const subscriptions_model_1 = require("./subscriptions.model");
 // import stripe from '../../config/stripe';
 const subscriptions = (0, catchAsync_1.default)(async (req, res) => {
     (0, sendResponse_1.default)(res, {
@@ -20,11 +21,58 @@ const subscriptions = (0, catchAsync_1.default)(async (req, res) => {
     });
 });
 const subscriptionDetails = (0, catchAsync_1.default)(async (req, res) => {
+    const authenticatedId = req.user?.id;
+    const userId = Array.isArray(authenticatedId)
+        ? authenticatedId[0]
+        : authenticatedId;
+    if (!userId) {
+        throw new AppError_1.default(http_status_codes_1.StatusCodes.UNAUTHORIZED, "Authentication is required.");
+    }
+    const subscriptions = await subscriptions_model_1.Subscription.find({ userId })
+        .select([
+        "status",
+        "stripeStatus",
+        "currentPeriodEnd",
+        "trialEnd",
+        "cancelAtPeriodEnd",
+        "paymentCollectionPaused",
+    ].join(" "))
+        .sort({ createdAt: -1 })
+        .lean();
+    const now = Date.now();
+    const isFutureDate = (value) => {
+        if (!value)
+            return false;
+        const timestamp = new Date(value).getTime();
+        return Number.isFinite(timestamp) && timestamp > now;
+    };
+    const hasActiveSubscription = subscriptions.some((subscription) => {
+        if (subscription.status !== "active") {
+            return false;
+        }
+        if (subscription.stripeStatus === "trialing") {
+            return isFutureDate(subscription.trialEnd);
+        }
+        if (subscription.stripeStatus === "active") {
+            return isFutureDate(subscription.currentPeriodEnd);
+        }
+        return false;
+    });
+    // Conservative checkout policy:
+    // Only records confirmed terminal by Stripe allow a new purchase.
+    // Missing/unknown Stripe status requires account review.
+    const hasUnresolvedSubscription = subscriptions.some((subscription) => subscription.stripeStatus !== "canceled" &&
+        subscription.stripeStatus !== "incomplete_expired");
+    const canStartCheckout = !hasActiveSubscription && !hasUnresolvedSubscription;
     (0, sendResponse_1.default)(res, {
-        statusCode: http_status_codes_1.StatusCodes.NOT_IMPLEMENTED,
-        success: false,
-        message: 'Subscription details retrieval is not implemented',
-        data: null,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        success: true,
+        message: "Subscription details retrieved successfully.",
+        data: {
+            hasActiveSubscription,
+            canStartCheckout,
+            requiresAccountReview: !hasActiveSubscription && !canStartCheckout,
+        },
     });
 });
 const cancelSubscription = (0, catchAsync_1.default)(async (req, res) => {

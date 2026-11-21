@@ -12,7 +12,6 @@ const router = express_1.default.Router();
 //USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN
 router.get('/', auth_middleware_1.auth, subscriptions_controller_1.SubscriptionController.subscriptions);
 router.get('/details', auth_middleware_1.auth, subscriptions_controller_1.SubscriptionController.subscriptionDetails);
-// router.get('/success', SubscriptionController.orderSuccess);
 router.get('/success', subscriptions_controller_1.checkoutSuccessController);
 router.get('/cancel', subscriptions_controller_1.SubscriptionController.orderCancel);
 router.post('/create-checkout-session/:id', auth_middleware_1.auth, subscriptions_controller_1.SubscriptionController.createCheckoutSession);

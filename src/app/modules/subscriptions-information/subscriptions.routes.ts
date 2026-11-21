@@ -9,7 +9,6 @@ const router = express.Router();
 router.get('/', auth, SubscriptionController.subscriptions);
 
 router.get('/details', auth, SubscriptionController.subscriptionDetails);
-// router.get('/success', SubscriptionController.orderSuccess);
 router.get('/success', checkoutSuccessController);
 router.get('/cancel', SubscriptionController.orderCancel);
 router.post('/create-checkout-session/:id', auth, SubscriptionController.createCheckoutSession);
